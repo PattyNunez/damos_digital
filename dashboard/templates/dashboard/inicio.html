@@ -1,0 +1,119 @@
+{% extends "base_shell.html" %}
+{% load l10n %}
+
+{% block title %}Dashboard de indicadores{% endblock %}
+
+{% block encabezado %}Dashboard de indicadores{% endblock %}
+
+{% block content %}
+<p><a class="enlace-volver" href="{% url 'dashboard:kanban' %}">Ver panel de seguimiento (kanban) →</a></p>
+
+<div class="rejilla-indicadores">
+
+  {% if alertas %}
+  <div class="tarjeta-indicador tarjeta-ancha tarjeta-alerta">
+    <div class="encabezado-tarjeta">
+      <span class="icono-indicador icono-alerta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#FF0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a1.8 1.8 0 0 0 1.6 2.6h15.8a1.8 1.8 0 0 0 1.6-2.6L13.7 3.9a1.6 1.6 0 0 0-2.8 0z"/></svg>
+      </span>
+      <h2>Alertas ({{ alertas|length }})</h2>
+    </div>
+    <div class="tabla-scroll">
+      <table class="mediciones tabla-alertas">
+        <tr><th>Servicio</th><th>Cliente</th><th>Motivo</th><th>Días</th><th></th></tr>
+        {% for a in alertas %}
+        <tr>
+          <td>{{ a.servicio.codigo }}</td>
+          <td>{{ a.servicio.cliente }}</td>
+          <td>{{ a.motivo }}</td>
+          <td><strong>{{ a.dias }}</strong> / {{ a.umbral }}</td>
+          <td><a class="enlace-accion" href="{% url 'dashboard:detalle_servicio' a.servicio.pk %}">Ver →</a></td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    <p class="ayuda">
+      Umbrales actuales: {{ alertas_cotizacion|length }} cotización(es) sin aprobar y
+      {{ alertas_ejecucion|length }} trabajo(s) atrasado(s). Configurable desde el admin
+      (Configuración de alertas).
+    </p>
+  </div>
+  {% endif %}
+
+  <div class="tarjeta-indicador">
+    <div class="encabezado-tarjeta">
+      <span class="icono-indicador">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+      </span>
+      <h2>Servicios por estado</h2>
+    </div>
+    {% for fila in servicios_por_estado %}
+    <div class="barra-horizontal">
+      <span class="etiqueta-barra">{{ fila.estado }}</span>
+      <span class="pista-barra"><span class="relleno-barra relleno-estado-{{ fila.clave }}" style="width:{{ fila.porcentaje|unlocalize }}%"></span></span>
+      <span class="valor-barra">{{ fila.total }}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="tarjeta-indicador tarjeta-ancha">
+    <div class="encabezado-tarjeta">
+      <span class="icono-indicador">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      </span>
+      <h2>Tiempo promedio entre cambios de estado</h2>
+    </div>
+    <div class="tabla-scroll">
+      <table class="mediciones tabla-transiciones">
+        <tr><th>Transición</th><th>Promedio (días)</th><th>Servicios</th></tr>
+        {% for t in tiempos_transicion %}
+        <tr{% if t.es_total %} class="fila-total"{% endif %}>
+          <td>{{ t.origen }} → {{ t.destino }}</td>
+          <td>{% if t.promedio_dias is not None %}{{ t.promedio_dias }}{% else %}Sin datos{% endif %}</td>
+          <td>{{ t.cantidad }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    <p class="ayuda">
+      Un servicio solo se cuenta en una transición si efectivamente la completó.
+      Fila destacada: ciclo completo.
+    </p>
+  </div>
+
+  <div class="tarjeta-indicador">
+    <div class="encabezado-tarjeta">
+      <span class="icono-indicador">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="1.8"/><circle cx="17" cy="17" r="1.8"/><path d="M5 19L19 5"/></svg>
+      </span>
+      <h2>% de preventivos que derivan en correctivo</h2>
+    </div>
+    <p class="dato-destacado">
+      {% if preventivos_correctivo.porcentaje is not None %}{{ preventivos_correctivo.porcentaje }}%{% else %}Sin datos{% endif %}
+    </p>
+    <p>
+      {{ preventivos_correctivo.con_correctivo }} de {{ preventivos_correctivo.total_preventivos }}
+      servicios preventivos generaron al menos un correctivo.
+    </p>
+  </div>
+
+  <div class="tarjeta-indicador">
+    <div class="encabezado-tarjeta">
+      <span class="icono-indicador">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><circle cx="17.5" cy="9" r="2.3"/><path d="M15.5 20c.2-2.2 2-4 5-4"/></svg>
+      </span>
+      <h2>Servicios por cliente</h2>
+    </div>
+    {% for fila in servicios_por_cliente %}
+    <div class="barra-horizontal">
+      <span class="etiqueta-barra" title="{{ fila.cliente__razon_social }}">{{ fila.cliente__razon_social }}</span>
+      <span class="pista-barra"><span class="relleno-barra relleno-cliente" style="width:{{ fila.porcentaje|unlocalize }}%"></span></span>
+      <span class="valor-barra">{{ fila.total }}</span>
+    </div>
+    {% empty %}
+    <p class="ayuda">Sin servicios registrados.</p>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base_shell.html" %}
+
+{% block title %}Eliminar cliente{% endblock %}
+
+{% block encabezado %}Eliminar cliente{% endblock %}
+
+{% block content %}
+<div class="tarjeta-seccion">
+  <p>¿Confirmas eliminar a <strong>{{ cliente.razon_social }}</strong>? Esta acción no se puede deshacer.</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="peligro">Sí, eliminar</button>
+    <a class="enlace-volver" href="{% url 'clientes:lista' %}" style="margin-left:1rem;">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

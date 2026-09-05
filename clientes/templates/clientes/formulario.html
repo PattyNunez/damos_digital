@@ -1,0 +1,73 @@
+{% extends "base_shell.html" %}
+
+{% block title %}{% if cliente %}Editar cliente{% else %}Nuevo cliente{% endif %}{% endblock %}
+
+{% block encabezado %}{% if cliente %}Editar cliente{% else %}Nuevo cliente{% endif %}{% endblock %}
+
+{% block content %}
+<p><a class="enlace-volver" href="{% url 'clientes:lista' %}">&larr; Volver a clientes</a></p>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+
+  <div class="tarjeta-seccion">
+    <h2>Datos generales</h2>
+
+    <label for="{{ form.razon_social.id_for_label }}">Razón social</label>
+    {{ form.razon_social }}
+    {{ form.razon_social.errors }}
+
+    <label for="{{ form.codigo_corto.id_for_label }}">Código corto</label>
+    {{ form.codigo_corto }}
+    {% if form.codigo_corto.disabled %}
+      <p class="ayuda">No editable: este cliente ya tiene servicios registrados con este código.</p>
+    {% else %}
+      <p class="ayuda">Se usa en los correlativos de servicio (ej. VOLCAN). Evita cambiarlo luego de crear servicios.</p>
+    {% endif %}
+    {{ form.codigo_corto.errors }}
+
+    <label for="{{ form.ruc.id_for_label }}">RUC</label>
+    {{ form.ruc }}
+    {{ form.ruc.errors }}
+
+    <label for="{{ form.direccion.id_for_label }}">Dirección</label>
+    {{ form.direccion }}
+
+    <label for="{{ form.contacto_nombre.id_for_label }}">Nombre de contacto</label>
+    {{ form.contacto_nombre }}
+
+    <label for="{{ form.contacto_telefono.id_for_label }}">Teléfono de contacto</label>
+    {{ form.contacto_telefono }}
+
+    <label for="{{ form.contacto_email.id_for_label }}">Correo de contacto</label>
+    {{ form.contacto_email }}
+    {{ form.contacto_email.errors }}
+
+    <label for="{{ form.logo.id_for_label }}">Logo (opcional, se usa en el informe PDF)</label>
+    {% if cliente.logo %}<p class="ayuda">Actual: <a href="{{ cliente.logo.url }}" target="_blank">ver logo</a></p>{% endif %}
+    {{ form.logo }}
+  </div>
+
+  <div class="tarjeta-seccion">
+    <h2>Ubicaciones</h2>
+    {{ ubicaciones_formset.management_form }}
+    {{ ubicaciones_formset.non_form_errors }}
+    {% for f in ubicaciones_formset %}
+      <div class="fila-formset">
+        {% for hidden in f.hidden_fields %}{{ hidden }}{% endfor %}
+        <label for="{{ f.nombre.id_for_label }}">Nombre de la sede</label>
+        {{ f.nombre }}
+        {{ f.nombre.errors }}
+        <label for="{{ f.direccion.id_for_label }}">Dirección</label>
+        {{ f.direccion }}
+        {% if f.instance.pk %}
+          <label>{{ f.DELETE }} Eliminar esta ubicación</label>
+        {% endif %}
+        {{ f.non_field_errors }}
+      </div>
+    {% endfor %}
+  </div>
+
+  <button type="submit">Guardar cliente</button>
+</form>
+{% endblock %}

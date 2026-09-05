@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Mis servicios{% endblock %}
+
+{% block content %}
+<h1>Mis servicios</h1>
+
+{% if not tecnico %}
+  <section>
+    <p class="ayuda">Tu usuario todavía no está enlazado a un registro de personal (Técnico). Pídele a un administrador que lo configure desde el admin para poder ver tus servicios asignados.</p>
+  </section>
+{% endif %}
+
+<section>
+  {% for s in servicios %}
+    <div class="fila-formset">
+      <strong>{{ s.codigo }}</strong> — {{ s.get_tipo_servicio_display }}<br>
+      {{ s.cliente }} — {{ s.equipo }}<br>
+      <span class="ayuda">Estado: {{ s.get_estado_display }}</span><br>
+      <a href="{% url 'servicios:formulario' s.pk %}"><button type="button">Abrir formulario de campo</button></a>
+    </div>
+  {% empty %}
+    <p>No tienes servicios asignados todavía.</p>
+  {% endfor %}
+</section>
+{% endblock %}

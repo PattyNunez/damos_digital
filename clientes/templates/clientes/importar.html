@@ -1,0 +1,48 @@
+{% extends "base_shell.html" %}
+
+{% block title %}Importar clientes desde Excel{% endblock %}
+
+{% block encabezado %}Importar clientes desde Excel{% endblock %}
+
+{% block content %}
+<p><a class="enlace-volver" href="{% url 'clientes:lista' %}">&larr; Volver a clientes</a></p>
+
+<div class="tarjeta-seccion">
+  <h2>Formato esperado</h2>
+  <p>Un archivo <code>.xlsx</code>, primera fila con estos encabezados (el orden de columnas no importa):</p>
+  <table class="mediciones">
+    <tr><th>Encabezado</th><th>Obligatorio</th><th>Notas</th></tr>
+    <tr><td>Código corto</td><td>Sí</td><td>Si ya existe, se actualiza el cliente en vez de duplicarlo</td></tr>
+    <tr><td>Razón social</td><td>Sí</td><td></td></tr>
+    <tr><td>RUC</td><td>No</td><td>11 dígitos, empieza con 10/15/16/17/20</td></tr>
+    <tr><td>Dirección</td><td>No</td><td></td></tr>
+    <tr><td>Contacto - nombre</td><td>No</td><td></td></tr>
+    <tr><td>Contacto - teléfono</td><td>No</td><td></td></tr>
+    <tr><td>Contacto - correo</td><td>No</td><td>Formato de correo válido</td></tr>
+  </table>
+
+  <form method="post" enctype="multipart/form-data" style="margin-top:1.2rem;">
+    {% csrf_token %}
+    <label for="{{ form.archivo.id_for_label }}">{{ form.archivo.label }}</label>
+    {{ form.archivo }}
+    {{ form.archivo.errors }}
+    <button type="submit">Importar</button>
+  </form>
+</div>
+
+{% if resultado %}
+<div class="tarjeta-seccion">
+  <h2>Resultado de la importación</h2>
+  <p>{{ resultado.creados }} cliente(s) creado(s), {{ resultado.actualizados }} actualizado(s).</p>
+
+  {% if resultado.errores %}
+  <h3>Filas con error ({{ resultado.errores|length }})</h3>
+  <ul>
+    {% for error in resultado.errores %}
+    <li class="ayuda">{{ error }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,26 @@
+<tr class="fila-item{% if form.DELETE.value %} fila-eliminada{% endif %}">
+  {{ form.id }}
+  <td>
+    <div class="combo-buscar combo-texto-libre combo-fila-texto" data-tipo="{{ tipo }}">
+      <div class="combo-caja">
+        {{ form.descripcion }}
+        <button type="button" class="combo-btn-nuevo combo-btn-nuevo-compacto" title="Agregar nuevo al catálogo">+</button>
+      </div>
+      <ul class="combo-lista" hidden></ul>
+    </div>
+    {% if not form.DELETE.value %}{{ form.descripcion.errors }}{% endif %}
+  </td>
+  <td>
+    {{ form.cantidad }}
+    {% if not form.DELETE.value %}{{ form.cantidad.errors }}{% endif %}
+  </td>
+  <td>
+    {{ form.costo_unitario }}
+    {% if not form.DELETE.value %}{{ form.costo_unitario.errors }}{% endif %}
+  </td>
+  <td class="subtotal-fila">0.00</td>
+  <td>
+    {{ form.DELETE }}
+    <button type="button" class="btn-eliminar-fila" title="Eliminar línea">&times;</button>
+  </td>
+</tr>

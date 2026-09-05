@@ -1,0 +1,39 @@
+{% extends "base_shell.html" %}
+
+{% block title %}Proveedores{% endblock %}
+
+{% block encabezado %}Proveedores{% endblock %}
+
+{% block content %}
+<p class="subnav">
+  <a class="enlace-accion" href="{% url 'inventario:productos' %}">Productos</a> · <strong>Proveedores</strong>
+</p>
+
+<div class="tarjeta-seccion">
+  <div class="barra-acciones">
+    <form method="get" class="buscador">
+      <input type="text" name="q" value="{{ q }}" placeholder="Buscar por razón social o RUC...">
+      <button type="submit">Buscar</button>
+    </form>
+    <a href="{% url 'inventario:proveedor_nuevo' %}"><button type="button">+ Nuevo proveedor</button></a>
+  </div>
+
+  <table class="mediciones">
+    <tr><th>Razón social</th><th>RUC</th><th>Contacto</th><th>Estado</th><th></th></tr>
+    {% for pr in proveedores %}
+    <tr>
+      <td>{{ pr.razon_social }}</td>
+      <td>{{ pr.ruc|default:"—" }}</td>
+      <td>{{ pr.contacto_nombre|default:"—" }}</td>
+      <td>{% if pr.activo %}Activo{% else %}<span class="ayuda">Inactivo</span>{% endif %}</td>
+      <td class="acciones">
+        <a class="enlace-accion" href="{% url 'inventario:proveedor_editar' pr.pk %}">Editar</a>
+        · <a class="enlace-accion peligro" href="{% url 'inventario:proveedor_eliminar' pr.pk %}">Eliminar</a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5">Sin proveedores registrados{% if q %} para "{{ q }}"{% endif %}.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

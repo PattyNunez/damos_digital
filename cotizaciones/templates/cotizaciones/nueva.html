@@ -1,0 +1,1221 @@
+{% extends "base_shell.html" %}
+
+{% block title %}{% if servicio %}Editar cotización {{ servicio.codigo }}{% else %}Nueva cotización{% endif %}{% endblock %}
+
+{% block encabezado %}{% if servicio %}Editar cotización {{ servicio.codigo }}{% else %}Nueva cotización{% endif %}{% endblock %}
+
+{% block extra_style %}
+<style>
+  .tabla-lineas { width:100%; border-collapse:collapse; margin-top:.5rem; }
+  .tabla-lineas th { text-align:left; font-size:.8rem; color:#666; padding:.2rem .45rem; border-bottom:1px solid #e1e4e8; }
+  .tabla-lineas td { padding:.2rem .45rem; vertical-align:top; }
+  .tabla-lineas input[type=text], .tabla-lineas input[type=number], .tabla-lineas select { margin:0; }
+  .tabla-lineas td.subtotal-fila { white-space:nowrap; font-weight:600; color:var(--gris-oscuro); padding-top:.55rem; }
+  .tabla-lineas input[type=checkbox] { display:none; }
+
+  /* --- Calculador de costos: tarjetas por categoría, ancho de columna fijo --- */
+  .tarjeta-categoria { padding:.85rem 1rem 1rem; }
+  .encabezado-categoria { display:flex; align-items:center; justify-content:space-between; gap:.75rem; border-bottom:2px solid var(--naranja-damol); padding-bottom:.4rem; margin-bottom:.6rem; }
+  .encabezado-categoria h2 { margin:0; border:none; padding:0; display:inline; font-size:1.05rem; }
+  .encabezado-categoria .header-derecha { display:flex; align-items:center; gap:.75rem; flex-shrink:0; }
+  .subtotal-categoria { font-size:.85rem; color:#666; white-space:nowrap; }
+  .subtotal-categoria strong { color:var(--gris-oscuro); }
+  .btn-colapsar {
+    background:none; border:1px solid #d5d8dc; color:#888; width:1.9rem; height:1.9rem; border-radius:6px;
+    cursor:pointer; font-size:.8rem; line-height:1; flex-shrink:0; transition:transform .15s ease;
+  }
+  .btn-colapsar:hover { background:#f0f1f3; color:var(--gris-oscuro); }
+  .tarjeta-categoria.colapsada .btn-colapsar { transform:rotate(-90deg); }
+  .tarjeta-categoria.colapsada .cuerpo-categoria { display:none; }
+
+  .tabla-costos { table-layout:fixed; }
+  .tabla-costos col.col-cantidad { width:80px; }
+  .tabla-costos col.col-costo { width:120px; }
+  .tabla-costos col.col-subtotal { width:100px; }
+  .tabla-costos col.col-acciones { width:40px; }
+
+  .barra-total-sticky {
+    position:sticky; top:0; z-index:5; background:#fff; border-radius:8px; border-top:3px solid var(--naranja-damol);
+    box-shadow:0 2px 10px rgba(0,0,0,.14); padding:.6rem 1.1rem; margin-bottom:1.2rem;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .barra-total-sticky .etiqueta-total { color:#666; font-size:.85rem; }
+  .barra-total-sticky .valor-total { font-size:1.35rem; font-weight:700; color:var(--gris-oscuro); }
+
+  /* --- Combobox "buscar o crear" (Cliente / Equipo / Ubicación) --- */
+  .combo-buscar { position:relative; }
+  .combo-buscar select { display:none; }
+  .combo-caja { display:flex; gap:.5rem; align-items:center; }
+  .combo-input { flex:1; margin:0; }
+  .combo-texto-libre .combo-caja input[type=text] { flex:1; margin:0; min-width:0; }
+  .combo-btn-nuevo-compacto { padding:0 .55rem; }
+  .combo-btn-nuevo {
+    background:#e5e7eb; color:var(--gris-oscuro); border:none; border-radius:6px; padding:0 .8rem;
+    font-size:.85rem; font-weight:600; cursor:pointer; white-space:nowrap; flex-shrink:0; height:2.35rem;
+  }
+  .combo-btn-nuevo:hover { filter:brightness(.95); }
+  .combo-btn-nuevo:disabled { opacity:.5; cursor:not-allowed; filter:none; }
+  .combo-lista {
+    position:absolute; z-index:20; top:100%; left:0; right:0; margin:.25rem 0 0; padding:.3rem 0;
+    background:#fff; border:1px solid #d5d8dc; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.16);
+    max-height:220px; overflow-y:auto; list-style:none;
+  }
+  .combo-lista[hidden] { display:none; }
+  .combo-lista li { padding:.5rem .8rem; cursor:pointer; font-size:.9rem; }
+  .combo-lista li:hover, .combo-lista li.resaltado { background:#fff3e0; }
+  .combo-lista li.combo-opcion-crear { color:var(--naranja-damol); font-weight:600; border-top:1px solid #eee; margin-top:.2rem; padding-top:.55rem; }
+  .combo-lista li.combo-sin-resultados { color:#999; cursor:default; }
+  .combo-lista li.combo-sin-resultados:hover { background:none; }
+
+  .overlay-modal { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:50; display:flex; align-items:center; justify-content:center; padding:1rem; }
+  .overlay-modal[hidden] { display:none; }
+  .caja-modal { background:#fff; border-radius:10px; padding:1.5rem; width:100%; max-width:420px; box-shadow:0 10px 30px rgba(0,0,0,.3); }
+  .caja-modal h3 { margin:0 0 1rem; color:var(--gris-oscuro); }
+  .caja-modal label { display:block; margin-top:.7rem; font-size:.85rem; color:#555; }
+  .caja-modal input, .caja-modal select { width:100%; margin-top:.2rem; }
+  .acciones-modal { display:flex; justify-content:flex-end; gap:.6rem; margin-top:1.3rem; }
+  .error-modal { color:var(--rojo-damol); font-size:.85rem; margin-top:.6rem; }
+  .error-modal[hidden] { display:none; }
+  .btn-eliminar-fila {
+    background:none; border:1px solid #d5d8dc; color:#888; width:1.9rem; height:1.9rem; border-radius:6px;
+    cursor:pointer; font-size:1.1rem; line-height:1; margin-top:0;
+  }
+  .btn-eliminar-fila:hover { background:#fbdcdc; color:var(--rojo-damol); border-color:var(--rojo-damol); }
+  .fila-item.fila-eliminada { display:none; }
+  .resumen-seccion { display:flex; justify-content:flex-end; gap:.5rem; margin-top:.75rem; font-size:.95rem; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:0 1.5rem; }
+  .moneda-producto { display:block; margin-top:.15rem; }
+  .moneda-producto.aviso-moneda { color:var(--rojo-damol); font-weight:600; }
+  @media (max-width:800px) { .grid-2 { grid-template-columns:1fr; } }
+  .tabla-resumen { width:100%; border-collapse:collapse; }
+  .tabla-resumen td { padding:.45rem .2rem; border-bottom:1px solid #eee; }
+  .tabla-resumen td:last-child { text-align:right; font-weight:600; white-space:nowrap; }
+  .tabla-resumen tr.fila-total-resumen td { border-bottom:none; border-top:2px solid var(--naranja-damol); font-size:1.2rem; padding-top:.7rem; }
+
+  .lista-textos { list-style:none; margin:.5rem 0 0 0; padding:0; border:1px solid #e1e4e8; border-radius:8px; }
+  .fila-texto { display:flex; align-items:flex-start; gap:.5rem; padding:.5rem .7rem; border-bottom:1px solid #f0f1f3; }
+  .fila-texto .combo-buscar { flex:1; min-width:0; }
+  .fila-texto:last-child { border-bottom:none; }
+  .fila-texto input[type=text] { flex:1; margin:0; }
+  .bullet-item { font-size:1.1rem; line-height:1.6rem; color:var(--naranja-damol); }
+  .lista-exclusion .bullet-item { color:var(--rojo-damol); }
+  .lista-provision_cliente .bullet-item { color:#888; }
+  .acciones-fila-texto { display:flex; gap:.25rem; flex-shrink:0; }
+  .acciones-fila-texto input[type=checkbox] { display:none; }
+  .btn-mover-arriba, .btn-mover-abajo {
+    background:none; border:1px solid #d5d8dc; color:#888; width:1.9rem; height:1.9rem; border-radius:6px;
+    cursor:pointer; font-size:.7rem; line-height:1;
+  }
+  .btn-mover-arriba:hover, .btn-mover-abajo:hover { background:#f0f1f3; color:var(--gris-oscuro); }
+</style>
+{% endblock %}
+
+{% block content %}
+<p><a class="enlace-volver" href="{% url 'cotizaciones:lista' %}">&larr; Volver a cotizaciones</a></p>
+
+<form method="post">
+  {% csrf_token %}
+
+  <div class="barra-total-sticky">
+    <span class="etiqueta-total">Total estimado de la cotización</span>
+    <span class="valor-total"><span id="barra-total-valor">0.00</span> <span id="barra-total-moneda">PEN</span></span>
+  </div>
+
+  <div class="tarjeta-seccion">
+    <h2>Datos generales</h2>
+    <div class="grid-2">
+      <div>
+        <label for="{{ servicio_form.tipo_servicio.id_for_label }}">Tipo de servicio</label>
+        {{ servicio_form.tipo_servicio }}
+        {{ servicio_form.tipo_servicio.errors }}
+
+        <label for="{{ servicio_form.cliente.id_for_label }}">Cliente</label>
+        <div class="combo-buscar" data-combo="cliente">
+          {{ servicio_form.cliente }}
+          <div class="combo-caja">
+            <input type="text" class="combo-input" placeholder="Buscar cliente..." autocomplete="off">
+            <button type="button" class="combo-btn-nuevo">+ Nuevo</button>
+          </div>
+          <ul class="combo-lista" hidden></ul>
+        </div>
+        {{ servicio_form.cliente.errors }}
+
+        <label for="{{ servicio_form.equipo.id_for_label }}">Equipo</label>
+        <div class="combo-buscar" data-combo="equipo">
+          {{ servicio_form.equipo }}
+          <div class="combo-caja">
+            <input type="text" class="combo-input" placeholder="Elige un cliente primero..." autocomplete="off" disabled>
+            <button type="button" class="combo-btn-nuevo" disabled>+ Nuevo</button>
+          </div>
+          <ul class="combo-lista" hidden></ul>
+        </div>
+        {{ servicio_form.equipo.errors }}
+
+        <label for="{{ servicio_form.ubicacion.id_for_label }}">Ubicación (opcional)</label>
+        <div class="combo-buscar" data-combo="ubicacion">
+          {{ servicio_form.ubicacion }}
+          <div class="combo-caja">
+            <input type="text" class="combo-input" placeholder="Elige un cliente primero..." autocomplete="off" disabled>
+            <button type="button" class="combo-btn-nuevo" disabled>+ Nuevo</button>
+          </div>
+          <ul class="combo-lista" hidden></ul>
+        </div>
+
+        <div id="campo-servicio-origen" style="display:none;">
+          <label for="{{ servicio_form.servicio_origen.id_for_label }}">{{ servicio_form.servicio_origen.label }}</label>
+          {{ servicio_form.servicio_origen }}
+          <p class="ayuda">El preventivo que originó este correctivo, si aplica.</p>
+        </div>
+      </div>
+      <div>
+        <label for="{{ servicio_form.orden_compra.id_for_label }}">Orden de compra (opcional)</label>
+        {{ servicio_form.orden_compra }}
+
+        <label for="{{ servicio_form.titulo.id_for_label }}">Título (opcional)</label>
+        {{ servicio_form.titulo }}
+
+        <label for="{{ servicio_form.elaborado_por.id_for_label }}">Elaborado por</label>
+        <div class="combo-buscar combo-texto-libre" data-tipo="elaborado_por">
+          <div class="combo-caja">
+            {{ servicio_form.elaborado_por }}
+            <button type="button" class="combo-btn-nuevo">+ Nuevo</button>
+          </div>
+          <ul class="combo-lista" hidden></ul>
+        </div>
+
+        <label for="{{ servicio_form.moneda.id_for_label }}">Moneda</label>
+        {{ servicio_form.moneda }}
+      </div>
+    </div>
+  </div>
+
+  <div class="tarjeta-seccion">
+    <h2>Cuadrilla</h2>
+    <p class="ayuda">Técnicos asignados a este servicio. La firma se recoge en ejecución, no acá.</p>
+    <table class="tabla-lineas">
+      <thead><tr><th>Técnico</th><th>Rol</th><th></th></tr></thead>
+      <tbody id="cuerpo-personal">
+        {{ personal_formset.management_form }}
+        {% for form in personal_formset %}
+          {% include "cotizaciones/_fila_personal.html" %}
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" class="secundario" id="btn-agregar-personal">+ Agregar técnico</button>
+    <template id="plantilla-fila-personal">
+      {% include "cotizaciones/_fila_personal.html" with form=personal_formset.empty_form %}
+    </template>
+  </div>
+
+  <div class="grid-2">
+    <div class="tarjeta-seccion tarjeta-categoria" id="categoria-mano_obra">
+      <div class="encabezado-categoria">
+        <h2>👷 Mano de obra</h2>
+        <div class="header-derecha">
+          <span class="subtotal-categoria">Subtotal: <strong id="subtotal-mano_obra">0.00</strong></span>
+          <button type="button" class="btn-colapsar" data-categoria="mano_obra" title="Colapsar/expandir">▾</button>
+        </div>
+      </div>
+      <div class="cuerpo-categoria">
+        <table class="tabla-lineas tabla-costos">
+          <colgroup><col><col class="col-cantidad"><col class="col-costo"><col class="col-subtotal"><col class="col-acciones"></colgroup>
+          <thead><tr><th>Descripción</th><th>Cantidad</th><th>Costo unitario</th><th>Subtotal</th><th></th></tr></thead>
+          <tbody id="cuerpo-mano_obra">
+            {{ mano_obra_formset.management_form }}
+            {% for form in mano_obra_formset %}
+              {% include "cotizaciones/_fila_item.html" with tipo="mano_obra" %}
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="secundario" id="btn-agregar-mano_obra">+ Agregar línea</button>
+        <template id="plantilla-fila-mano_obra">
+          {% include "cotizaciones/_fila_item.html" with form=mano_obra_formset.empty_form tipo="mano_obra" %}
+        </template>
+      </div>
+    </div>
+
+    <div class="tarjeta-seccion tarjeta-categoria" id="categoria-logistica">
+      <div class="encabezado-categoria">
+        <h2>🚗 Logística</h2>
+        <div class="header-derecha">
+          <span class="subtotal-categoria">Subtotal: <strong id="subtotal-logistica">0.00</strong></span>
+          <button type="button" class="btn-colapsar" data-categoria="logistica" title="Colapsar/expandir">▾</button>
+        </div>
+      </div>
+      <div class="cuerpo-categoria">
+        <table class="tabla-lineas tabla-costos">
+          <colgroup><col><col class="col-cantidad"><col class="col-costo"><col class="col-subtotal"><col class="col-acciones"></colgroup>
+          <thead><tr><th>Descripción</th><th>Cantidad</th><th>Costo unitario</th><th>Subtotal</th><th></th></tr></thead>
+          <tbody id="cuerpo-logistica">
+            {{ logistica_formset.management_form }}
+            {% for form in logistica_formset %}
+              {% include "cotizaciones/_fila_item.html" with tipo="logistica" %}
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="secundario" id="btn-agregar-logistica">+ Agregar línea</button>
+        <template id="plantilla-fila-logistica">
+          {% include "cotizaciones/_fila_item.html" with form=logistica_formset.empty_form tipo="logistica" %}
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="tarjeta-seccion tarjeta-categoria" id="categoria-equipo">
+      <div class="encabezado-categoria">
+        <h2>🔧 Equipos</h2>
+        <div class="header-derecha">
+          <span class="subtotal-categoria">Subtotal: <strong id="subtotal-equipo">0.00</strong></span>
+          <button type="button" class="btn-colapsar" data-categoria="equipo" title="Colapsar/expandir">▾</button>
+        </div>
+      </div>
+      <div class="cuerpo-categoria">
+        <table class="tabla-lineas tabla-costos">
+          <colgroup><col><col class="col-cantidad"><col class="col-costo"><col class="col-subtotal"><col class="col-acciones"></colgroup>
+          <thead><tr><th>Descripción</th><th>Cantidad</th><th>Costo unitario</th><th>Subtotal</th><th></th></tr></thead>
+          <tbody id="cuerpo-equipo">
+            {{ equipo_formset.management_form }}
+            {% for form in equipo_formset %}
+              {% include "cotizaciones/_fila_item.html" with tipo="equipo" %}
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="secundario" id="btn-agregar-equipo">+ Agregar línea</button>
+        <template id="plantilla-fila-equipo">
+          {% include "cotizaciones/_fila_item.html" with form=equipo_formset.empty_form tipo="equipo" %}
+        </template>
+      </div>
+    </div>
+
+    <div class="tarjeta-seccion tarjeta-categoria" id="categoria-material">
+      <div class="encabezado-categoria">
+        <h2>📦 Materiales</h2>
+        <div class="header-derecha">
+          <span class="subtotal-categoria">Subtotal: <strong id="subtotal-material">0.00</strong></span>
+          <button type="button" class="btn-colapsar" data-categoria="material" title="Colapsar/expandir">▾</button>
+        </div>
+      </div>
+      <div class="cuerpo-categoria">
+        <p class="ayuda">Al elegir un producto se precarga su precio de catálogo en "Costo unitario", pero queda editable. Si el producto está en una moneda distinta a la de esta cotización, se muestra en rojo como aviso — sin conversión automática.</p>
+        <table class="tabla-lineas tabla-costos">
+          <colgroup><col><col class="col-cantidad"><col class="col-costo"><col class="col-subtotal"><col class="col-acciones"></colgroup>
+          <thead><tr><th>Producto</th><th>Cantidad</th><th>Costo unitario</th><th>Subtotal</th><th></th></tr></thead>
+          <tbody id="cuerpo-material">
+            {{ material_formset.management_form }}
+            {% for form in material_formset %}
+              {% include "cotizaciones/_fila_material.html" %}
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="secundario" id="btn-agregar-material">+ Agregar línea</button>
+        <template id="plantilla-fila-material">
+          {% include "cotizaciones/_fila_material.html" with form=material_formset.empty_form %}
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <div class="tarjeta-seccion">
+    <h2>Alcance del servicio</h2>
+    <p class="ayuda">Tareas específicas que se van a realizar. Usa las flechas para reordenar.</p>
+    <ul class="lista-textos lista-alcance" id="lista-alcance">
+      {{ alcance_formset.management_form }}
+      {% for form in alcance_formset %}
+        {% include "cotizaciones/_fila_texto.html" with tipo="alcance" %}
+      {% endfor %}
+    </ul>
+    <button type="button" class="secundario" id="btn-agregar-alcance" style="margin-top:.6rem;">+ Agregar tarea</button>
+    <template id="plantilla-fila-alcance">
+      {% include "cotizaciones/_fila_texto.html" with form=alcance_formset.empty_form tipo="alcance" %}
+    </template>
+  </div>
+
+  <div class="tarjeta-seccion">
+    <h2>Exclusiones</h2>
+    <p class="ayuda">Qué NO incluye esta cotización — evita disputas después con el cliente.</p>
+    <ul class="lista-textos lista-exclusion" id="lista-exclusion">
+      {{ exclusion_formset.management_form }}
+      {% for form in exclusion_formset %}
+        {% include "cotizaciones/_fila_texto.html" with tipo="exclusion" %}
+      {% endfor %}
+    </ul>
+    <button type="button" class="secundario" id="btn-agregar-exclusion" style="margin-top:.6rem;">+ Agregar exclusión</button>
+    <template id="plantilla-fila-exclusion">
+      {% include "cotizaciones/_fila_texto.html" with form=exclusion_formset.empty_form tipo="exclusion" %}
+    </template>
+  </div>
+
+  <div class="grid-2">
+    <section class="tarjeta-seccion">
+      <h2>Provisiones por el cliente</h2>
+      <p class="ayuda">Qué debe proveer el cliente para ejecutar el servicio.</p>
+      <ul class="lista-textos lista-provision_cliente" id="lista-provision_cliente">
+        {{ provision_cliente_formset.management_form }}
+        {% for form in provision_cliente_formset %}
+          {% include "cotizaciones/_fila_texto.html" with tipo="provision_cliente" %}
+        {% endfor %}
+      </ul>
+      <button type="button" class="secundario" id="btn-agregar-provision_cliente" style="margin-top:.6rem;">+ Agregar ítem</button>
+      <template id="plantilla-fila-provision_cliente">
+        {% include "cotizaciones/_fila_texto.html" with form=provision_cliente_formset.empty_form tipo="provision_cliente" %}
+      </template>
+    </section>
+
+    <section class="tarjeta-seccion">
+      <h2>Provisiones por Damol</h2>
+      <p class="ayuda">Qué pone Damol para ejecutar el servicio.</p>
+      <ul class="lista-textos lista-provision_damol" id="lista-provision_damol">
+        {{ provision_damol_formset.management_form }}
+        {% for form in provision_damol_formset %}
+          {% include "cotizaciones/_fila_texto.html" with tipo="provision_damol" %}
+        {% endfor %}
+      </ul>
+      <button type="button" class="secundario" id="btn-agregar-provision_damol" style="margin-top:.6rem;">+ Agregar ítem</button>
+      <template id="plantilla-fila-provision_damol">
+        {% include "cotizaciones/_fila_texto.html" with form=provision_damol_formset.empty_form tipo="provision_damol" %}
+      </template>
+    </section>
+  </div>
+
+  <div class="tarjeta-seccion tarjeta-categoria">
+    <div class="encabezado-categoria">
+      <h2>📊 Indirectos y utilidad</h2>
+    </div>
+    <p class="ayuda">Los indirectos se calculan solo sobre mano de obra + logística + equipos (a validar con Damol cuando prueben una cotización real).</p>
+    <div class="grid-2">
+      <div>
+        <label for="{{ detalle_form.porcentaje_indirectos.id_for_label }}">% Indirectos</label>
+        {{ detalle_form.porcentaje_indirectos }}
+        <label for="{{ detalle_form.porcentaje_utilidad_servicio.id_for_label }}">% Utilidad servicio</label>
+        {{ detalle_form.porcentaje_utilidad_servicio }}
+      </div>
+      <div>
+        <label for="{{ detalle_form.porcentaje_utilidad_repuestos.id_for_label }}">% Utilidad repuestos</label>
+        {{ detalle_form.porcentaje_utilidad_repuestos }}
+      </div>
+    </div>
+  </div>
+
+  <div class="tarjeta-seccion">
+    <h2>Resumen (vista previa)</h2>
+    <p class="ayuda">Se recalcula solo en el navegador mientras completas el formulario; el cálculo real y definitivo se hace en el servidor al guardar.</p>
+    <table class="tabla-resumen">
+      <tr><td>Subtotal servicio (mano de obra + logística + equipos, con indirectos y utilidad)</td><td id="resumen-subtotal-servicio">0.00</td></tr>
+      <tr><td>Subtotal repuestos (materiales, con utilidad)</td><td id="resumen-subtotal-repuestos">0.00</td></tr>
+      <tr><td>Subtotal general</td><td id="resumen-subtotal-general">0.00</td></tr>
+      <tr><td>IGV (18%)</td><td id="resumen-igv">0.00</td></tr>
+      <tr class="fila-total-resumen"><td>Total</td><td id="resumen-total">0.00</td></tr>
+    </table>
+  </div>
+
+  <button type="submit">{% if servicio %}Guardar cambios{% else %}Guardar cotización{% endif %}</button>
+</form>
+
+<!-- Modales de creación rápida: viven fuera del <form> principal para no anidar formularios. -->
+<div class="overlay-modal" id="modal-cliente" hidden>
+  <div class="caja-modal">
+    <h3>Nuevo cliente</h3>
+    <form id="form-modal-cliente">
+      {% csrf_token %}
+      <label>Razón social</label>
+      <input type="text" name="razon_social" required>
+      <label>Código corto</label>
+      <input type="text" name="codigo_corto" required placeholder="Ej. VOLCAN">
+      <label>RUC (opcional)</label>
+      <input type="text" name="ruc">
+      <p class="error-modal" hidden></p>
+      <div class="acciones-modal">
+        <button type="button" class="secundario btn-cancelar-modal">Cancelar</button>
+        <button type="submit">Crear cliente</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="overlay-modal" id="modal-equipo" hidden>
+  <div class="caja-modal">
+    <h3>Nuevo equipo</h3>
+    <form id="form-modal-equipo">
+      {% csrf_token %}
+      <input type="hidden" name="cliente">
+      <label>Tipo de equipo</label>
+      <select name="tipo_equipo" required>
+        <option value="">---------</option>
+        {% for tipo in tipos_equipo %}
+        <option value="{{ tipo.pk }}">{{ tipo }}</option>
+        {% endfor %}
+      </select>
+      <label>Código interno / TAG (opcional)</label>
+      <input type="text" name="codigo_interno">
+      <p class="error-modal" hidden></p>
+      <div class="acciones-modal">
+        <button type="button" class="secundario btn-cancelar-modal">Cancelar</button>
+        <button type="submit">Crear equipo</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="overlay-modal" id="modal-ubicacion" hidden>
+  <div class="caja-modal">
+    <h3>Nueva ubicación</h3>
+    <form id="form-modal-ubicacion">
+      {% csrf_token %}
+      <input type="hidden" name="cliente">
+      <label>Nombre</label>
+      <input type="text" name="nombre" required>
+      <label>Dirección (opcional)</label>
+      <input type="text" name="direccion">
+      <p class="error-modal" hidden></p>
+      <div class="acciones-modal">
+        <button type="button" class="secundario btn-cancelar-modal">Cancelar</button>
+        <button type="submit">Crear ubicación</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="overlay-modal" id="modal-tecnico" hidden>
+  <div class="caja-modal">
+    <h3>Nuevo técnico</h3>
+    <form id="form-modal-tecnico">
+      {% csrf_token %}
+      <label>Nombres</label>
+      <input type="text" name="nombres" required>
+      <label>Apellidos</label>
+      <input type="text" name="apellidos" required>
+      <label>DNI</label>
+      <input type="text" name="dni" required>
+      <p class="error-modal" hidden></p>
+      <div class="acciones-modal">
+        <button type="button" class="secundario btn-cancelar-modal">Cancelar</button>
+        <button type="submit">Crear técnico</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="overlay-modal" id="modal-producto" hidden>
+  <div class="caja-modal">
+    <h3>Nuevo producto</h3>
+    <form id="form-modal-producto">
+      {% csrf_token %}
+      <label>Código</label>
+      <input type="text" name="codigo" required>
+      <label>Nombre</label>
+      <input type="text" name="nombre" required>
+      <label>Precio referencial</label>
+      <input type="number" step="0.01" name="precio_referencial" required>
+      <label>Moneda</label>
+      <select name="moneda">
+        <option value="PEN">Soles (PEN)</option>
+        <option value="USD">Dólares (USD)</option>
+      </select>
+      <p class="error-modal" hidden></p>
+      <div class="acciones-modal">
+        <button type="button" class="secundario btn-cancelar-modal">Cancelar</button>
+        <button type="submit">Crear producto</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script type="application/json" id="catalogo-items-json">{{ catalogo_json|safe }}</script>
+<script>
+(function () {
+  function numero(valor) {
+    const n = parseFloat(valor);
+    return isNaN(n) ? 0 : n;
+  }
+
+  const subtotalesSecciones = { mano_obra: 0, logistica: 0, equipo: 0, material: 0 };
+  const PORCENTAJE_IGV = 18; // mismo default de Servicio.porcentaje_igv; este form no lo expone
+
+  function actualizarResumenGeneral() {
+    const indirectosPct = numero(document.querySelector("#id_porcentaje_indirectos").value);
+    const utilidadServicioPct = numero(document.querySelector("#id_porcentaje_utilidad_servicio").value);
+    const utilidadRepuestosPct = numero(document.querySelector("#id_porcentaje_utilidad_repuestos").value);
+
+    const directoServicio = subtotalesSecciones.mano_obra + subtotalesSecciones.logistica + subtotalesSecciones.equipo;
+    const indirectos = (directoServicio * indirectosPct) / 100;
+    const baseServicio = directoServicio + indirectos;
+    const utilidadServicio = (baseServicio * utilidadServicioPct) / 100;
+    const subtotalServicio = baseServicio + utilidadServicio;
+
+    const materiales = subtotalesSecciones.material;
+    const utilidadRepuestos = (materiales * utilidadRepuestosPct) / 100;
+    const subtotalRepuestos = materiales + utilidadRepuestos;
+
+    const subtotalGeneral = subtotalServicio + subtotalRepuestos;
+    const igv = (subtotalGeneral * PORCENTAJE_IGV) / 100;
+    const total = subtotalGeneral + igv;
+
+    document.getElementById("resumen-subtotal-servicio").textContent = subtotalServicio.toFixed(2);
+    document.getElementById("resumen-subtotal-repuestos").textContent = subtotalRepuestos.toFixed(2);
+    document.getElementById("resumen-subtotal-general").textContent = subtotalGeneral.toFixed(2);
+    document.getElementById("resumen-igv").textContent = igv.toFixed(2);
+    document.getElementById("resumen-total").textContent = total.toFixed(2);
+
+    document.getElementById("barra-total-valor").textContent = total.toFixed(2);
+    document.getElementById("barra-total-moneda").textContent = document.querySelector("#id_moneda").value;
+  }
+
+  ["porcentaje_indirectos", "porcentaje_utilidad_servicio", "porcentaje_utilidad_repuestos"].forEach(function (campo) {
+    document.querySelector("#id_" + campo).addEventListener("input", actualizarResumenGeneral);
+  });
+  document.querySelector("#id_moneda").addEventListener("change", actualizarResumenGeneral);
+
+  function inicializarSeccion(opciones) {
+    const cuerpo = document.getElementById("cuerpo-" + opciones.prefix);
+    const totalFormsInput = document.querySelector("#id_" + opciones.prefix + "-TOTAL_FORMS");
+    const plantilla = document.getElementById("plantilla-fila-" + opciones.prefix);
+    const subtotalSpan = document.getElementById("subtotal-" + opciones.prefix);
+
+    function recalcularFila(fila) {
+      const cantidad = numero(fila.querySelector("input[name$='-cantidad']").value);
+      const costoUnitario = numero(fila.querySelector("input[name$='-costo_unitario']").value);
+      const subtotal = cantidad * costoUnitario;
+      fila.querySelector(".subtotal-fila").textContent = subtotal.toFixed(2);
+      return subtotal;
+    }
+
+    function recalcularTodo() {
+      let total = 0;
+      cuerpo.querySelectorAll(".fila-item").forEach(function (fila) {
+        if (fila.classList.contains("fila-eliminada")) return;
+        total += recalcularFila(fila);
+      });
+      subtotalSpan.textContent = total.toFixed(2);
+      subtotalesSecciones[opciones.prefix] = total;
+      actualizarResumenGeneral();
+    }
+
+    function marcarEliminada(fila) {
+      fila.classList.add("fila-eliminada");
+      fila.querySelectorAll("input[type=text], input[type=number]").forEach(function (campo) { campo.value = ""; });
+      fila.querySelectorAll("select").forEach(function (select) { select.selectedIndex = 0; });
+      const checkboxEliminar = fila.querySelector("input[type=checkbox]");
+      if (checkboxEliminar) checkboxEliminar.checked = true;
+      recalcularTodo();
+    }
+
+    function conectarFila(fila) {
+      inicializarCombosTextoLibre(fila);
+      fila.querySelectorAll("input[type=number]").forEach(function (campo) {
+        campo.addEventListener("input", recalcularTodo);
+      });
+      fila.querySelector(".btn-eliminar-fila").addEventListener("click", function () {
+        marcarEliminada(fila);
+      });
+      if (opciones.conectarExtra) opciones.conectarExtra(fila);
+    }
+
+    cuerpo.querySelectorAll(".fila-item").forEach(conectarFila);
+    recalcularTodo();
+
+    document.getElementById("btn-agregar-" + opciones.prefix).addEventListener("click", function () {
+      const indice = parseInt(totalFormsInput.value, 10);
+      const html = plantilla.innerHTML.replace(/__prefix__/g, indice);
+      const contenedor = document.createElement("tbody");
+      contenedor.innerHTML = html;
+      const nuevaFila = contenedor.querySelector(".fila-item");
+      cuerpo.appendChild(nuevaFila);
+      totalFormsInput.value = indice + 1;
+      conectarFila(nuevaFila);
+    });
+
+    // Colapsar por defecto si la categoría no tiene ninguna línea con datos reales (ni
+    // cantidad ni costo unitario en ninguna fila) — evita mostrar una fila vacía ocupando
+    // espacio para una categoría que esta cotización no usa.
+    const tarjeta = document.getElementById("categoria-" + opciones.prefix);
+    if (tarjeta) {
+      // "cantidad" trae un valor por defecto (1) incluso en una fila vacía nueva, así que no
+      // sirve para detectar si hay datos reales — costo_unitario y producto sí arrancan vacíos.
+      const tieneDatos = Array.from(cuerpo.querySelectorAll(".fila-item")).some(function (fila) {
+        const costo = fila.querySelector("input[name$='-costo_unitario']");
+        const producto = fila.querySelector("select[name$='-producto']");
+        return (costo && costo.value) || (producto && producto.value);
+      });
+      if (!tieneDatos) tarjeta.classList.add("colapsada");
+      tarjeta.querySelector(".btn-colapsar").addEventListener("click", function () {
+        tarjeta.classList.toggle("colapsada");
+      });
+    }
+  }
+
+  inicializarSeccion({ prefix: "mano_obra" });
+  inicializarSeccion({ prefix: "logistica" });
+  inicializarSeccion({ prefix: "equipo" });
+  inicializarSeccion({
+    prefix: "material",
+    conectarExtra: function (fila) {
+      inicializarCombosDeFila(fila);
+      const select = fila.querySelector("select[name$='-producto']");
+      if (!select) return;
+      select.addEventListener("change", function () {
+        const opcion = select.selectedOptions[0];
+        const costoInput = fila.querySelector("input[name$='-costo_unitario']");
+        const monedaSpan = fila.querySelector(".moneda-producto");
+        if (opcion && opcion.dataset.precio) {
+          if (!costoInput.value) costoInput.value = opcion.dataset.precio;
+          if (monedaSpan) {
+            const monedaCotizacion = document.querySelector("#id_moneda").value;
+            monedaSpan.textContent = "(" + opcion.dataset.moneda + ")";
+            monedaSpan.classList.toggle("aviso-moneda", opcion.dataset.moneda !== monedaCotizacion);
+          }
+        }
+        costoInput.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    },
+  });
+
+  function inicializarSeccionTexto(prefix) {
+    const lista = document.getElementById("lista-" + prefix);
+    const totalFormsInput = document.querySelector("#id_" + prefix + "-TOTAL_FORMS");
+    const plantilla = document.getElementById("plantilla-fila-" + prefix);
+
+    function marcarEliminada(fila) {
+      fila.classList.add("fila-eliminada");
+      const campoTexto = fila.querySelector("input[type=text]");
+      if (campoTexto) campoTexto.value = "";
+      const checkboxEliminar = fila.querySelector("input[type=checkbox]");
+      if (checkboxEliminar) checkboxEliminar.checked = true;
+    }
+
+    function conectarFila(fila) {
+      inicializarCombosTextoLibre(fila);
+      fila.querySelector(".btn-eliminar-fila").addEventListener("click", function () {
+        marcarEliminada(fila);
+      });
+      fila.querySelector(".btn-mover-arriba").addEventListener("click", function () {
+        const anterior = fila.previousElementSibling;
+        if (anterior) lista.insertBefore(fila, anterior);
+      });
+      fila.querySelector(".btn-mover-abajo").addEventListener("click", function () {
+        const siguiente = fila.nextElementSibling;
+        if (siguiente) lista.insertBefore(siguiente, fila);
+      });
+    }
+
+    lista.querySelectorAll(".fila-item").forEach(conectarFila);
+
+    document.getElementById("btn-agregar-" + prefix).addEventListener("click", function () {
+      const indice = parseInt(totalFormsInput.value, 10);
+      const html = plantilla.innerHTML.replace(/__prefix__/g, indice);
+      const contenedor = document.createElement("ul");
+      contenedor.innerHTML = html;
+      const nuevaFila = contenedor.querySelector(".fila-item");
+      lista.appendChild(nuevaFila);
+      totalFormsInput.value = indice + 1;
+      conectarFila(nuevaFila);
+    });
+
+    return function renumerar() {
+      let contador = 0;
+      lista.querySelectorAll(".fila-item").forEach(function (fila) {
+        if (fila.classList.contains("fila-eliminada")) return;
+        const campoOrden = fila.querySelector("input[name$='-orden']");
+        if (campoOrden) campoOrden.value = contador++;
+      });
+    };
+  }
+
+  const renumeradores = [
+    inicializarSeccionTexto("alcance"),
+    inicializarSeccionTexto("exclusion"),
+    inicializarSeccionTexto("provision_cliente"),
+    inicializarSeccionTexto("provision_damol"),
+  ];
+
+  document.querySelector("form").addEventListener("submit", function () {
+    renumeradores.forEach(function (renumerar) { renumerar(); });
+  });
+
+  // Cuadrilla: agregar/quitar filas simples, sin cálculo ni reordenar.
+  function inicializarSeccionSimple(prefix) {
+    const cuerpo = document.getElementById("cuerpo-" + prefix);
+    const totalFormsInput = document.querySelector("#id_" + prefix + "-TOTAL_FORMS");
+    const plantilla = document.getElementById("plantilla-fila-" + prefix);
+
+    function marcarEliminada(fila) {
+      fila.classList.add("fila-eliminada");
+      fila.querySelectorAll("input[type=text], input[type=number]").forEach(function (campo) { campo.value = ""; });
+      fila.querySelectorAll("select").forEach(function (select) { select.selectedIndex = 0; });
+      const checkbox = fila.querySelector("input[type=checkbox]");
+      if (checkbox) checkbox.checked = true;
+    }
+
+    function conectarFila(fila) {
+      inicializarCombosDeFila(fila);
+      fila.querySelector(".btn-eliminar-fila").addEventListener("click", function () {
+        marcarEliminada(fila);
+      });
+    }
+
+    cuerpo.querySelectorAll(".fila-item").forEach(conectarFila);
+
+    document.getElementById("btn-agregar-" + prefix).addEventListener("click", function () {
+      const indice = parseInt(totalFormsInput.value, 10);
+      const html = plantilla.innerHTML.replace(/__prefix__/g, indice);
+      const contenedor = document.createElement("tbody");
+      contenedor.innerHTML = html;
+      const nuevaFila = contenedor.querySelector(".fila-item");
+      cuerpo.appendChild(nuevaFila);
+      totalFormsInput.value = indice + 1;
+      conectarFila(nuevaFila);
+    });
+  }
+
+  inicializarSeccionSimple("personal");
+
+  // "Preventivo de origen": solo tiene sentido para Correctivo.
+  const campoOrigen = document.getElementById("campo-servicio-origen");
+  const selectTipoServicio = document.querySelector("#id_tipo_servicio");
+  function actualizarVisibilidadOrigen() {
+    const esCorrectivo = selectTipoServicio.value === "correctivo";
+    campoOrigen.style.display = esCorrectivo ? "" : "none";
+    if (!esCorrectivo) {
+      const select = campoOrigen.querySelector("select");
+      if (select) select.selectedIndex = 0;
+    }
+  }
+  selectTipoServicio.addEventListener("change", actualizarVisibilidadOrigen);
+  actualizarVisibilidadOrigen();
+
+  // Equipo y Ubicación filtrados por Cliente: cada <option> trae data-cliente; se oculta en
+  // el navegador la que no coincida, sin ida y vuelta al servidor.
+  const selectCliente = document.querySelector("#id_cliente");
+  const selectEquipo = document.querySelector("#id_equipo");
+  const selectUbicacion = document.querySelector("#id_ubicacion");
+
+  function crearFiltroPorCliente(select) {
+    const opciones = Array.from(select.options);
+    return function filtrar() {
+      const clienteId = selectCliente.value;
+      opciones.forEach(function (opcion) {
+        if (!opcion.value) { opcion.hidden = false; return; }
+        opcion.hidden = Boolean(clienteId) && opcion.dataset.cliente !== clienteId;
+      });
+      const opcionActual = select.selectedOptions[0];
+      if (opcionActual && opcionActual.value && opcionActual.hidden) {
+        select.value = "";
+      }
+    };
+  }
+
+  const filtrarEquiposPorCliente = crearFiltroPorCliente(selectEquipo);
+  const filtrarUbicacionesPorCliente = crearFiltroPorCliente(selectUbicacion);
+
+  // --- Combobox "buscar o crear": input de texto + lista filtrable encima del <select> real,
+  // que sigue siendo la fuente de verdad que se envía al servidor. ---
+  function inicializarCombo(prefijo, opciones) {
+    const wrapper = document.querySelector('.combo-buscar[data-combo="' + prefijo + '"]');
+    return inicializarComboEnElemento(wrapper, opciones);
+  }
+
+  // Misma función de arriba, pero recibiendo el wrapper directamente en vez de buscarlo por
+  // prefijo — necesario para Técnico/Materiales, que son filas de formset (puede haber varias
+  // a la vez, y se agregan nuevas dinámicamente con "+ Agregar línea").
+  function inicializarComboEnElemento(wrapper, opciones) {
+    const select = wrapper.querySelector("select");
+    const input = wrapper.querySelector(".combo-input");
+    const lista = wrapper.querySelector(".combo-lista");
+    const btnNuevo = wrapper.querySelector(".combo-btn-nuevo");
+
+    function opcionesDisponibles() {
+      return Array.from(select.options).filter(function (o) { return o.value && !o.hidden; });
+    }
+
+    function sincronizarDesdeSelect() {
+      const actual = select.selectedOptions[0];
+      input.value = actual && actual.value ? actual.textContent.trim() : "";
+    }
+
+    function cerrarLista() {
+      lista.hidden = true;
+      lista.innerHTML = "";
+    }
+
+    function elegir(valor) {
+      select.value = valor;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      sincronizarDesdeSelect();
+      cerrarLista();
+    }
+
+    function renderizarLista(filtro) {
+      const texto = filtro.trim().toLowerCase();
+      const coincidencias = opcionesDisponibles().filter(function (o) {
+        return o.textContent.toLowerCase().includes(texto);
+      });
+      lista.innerHTML = "";
+
+      if (coincidencias.length === 0) {
+        const li = document.createElement("li");
+        li.className = "combo-sin-resultados";
+        li.textContent = opcionesDisponibles().length === 0 ? opciones.mensajeVacio : "Sin resultados.";
+        lista.appendChild(li);
+      } else {
+        coincidencias.forEach(function (o) {
+          const li = document.createElement("li");
+          li.textContent = o.textContent.trim();
+          li.dataset.valor = o.value;
+          li.addEventListener("mousedown", function (e) { e.preventDefault(); elegir(o.value); });
+          lista.appendChild(li);
+        });
+      }
+
+      if (!btnNuevo.disabled) {
+        const liCrear = document.createElement("li");
+        liCrear.className = "combo-opcion-crear";
+        liCrear.textContent = "+ Crear " + opciones.etiqueta + (filtro.trim() ? ' "' + filtro.trim() + '"' : "...");
+        liCrear.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+          cerrarLista();
+          opciones.abrirModal(filtro.trim());
+        });
+        lista.appendChild(liCrear);
+      }
+
+      lista.hidden = false;
+    }
+
+    input.addEventListener("focus", function () {
+      input.select();
+      renderizarLista(""); // al enfocar, mostrar todas las opciones (el texto ya está seleccionado, listo para reemplazar)
+    });
+    input.addEventListener("input", function () { renderizarLista(input.value); });
+    input.addEventListener("blur", function () { setTimeout(cerrarLista, 150); });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { cerrarLista(); input.blur(); }
+    });
+    btnNuevo.addEventListener("click", function () { opciones.abrirModal(input.value); });
+
+    sincronizarDesdeSelect();
+    const api = { sincronizarDesdeSelect: sincronizarDesdeSelect };
+    wrapper._comboApi = api;
+    return api;
+  }
+
+  const comboCliente = inicializarCombo("cliente", {
+    etiqueta: "cliente",
+    mensajeVacio: "No hay clientes todavía.",
+    abrirModal: function (texto) { abrirModal("modal-cliente", { razon_social: texto }); },
+  });
+  const comboEquipo = inicializarCombo("equipo", {
+    etiqueta: "equipo",
+    mensajeVacio: "Este cliente no tiene equipos registrados.",
+    abrirModal: function () { abrirModal("modal-equipo", {}); },
+  });
+  const comboUbicacion = inicializarCombo("ubicacion", {
+    etiqueta: "ubicación",
+    mensajeVacio: "Este cliente no tiene ubicaciones registradas.",
+    abrirModal: function (texto) { abrirModal("modal-ubicacion", { nombre: texto }); },
+  });
+
+  // Equipo/Ubicación dependen del Cliente: deshabilitados hasta elegir uno.
+  function actualizarDisponibilidadDependientes() {
+    const hayCliente = Boolean(selectCliente.value);
+    [
+      { wrapper: '[data-combo="equipo"]' },
+      { wrapper: '[data-combo="ubicacion"]' },
+    ].forEach(function (item) {
+      const w = document.querySelector(".combo-buscar" + item.wrapper);
+      const input = w.querySelector(".combo-input");
+      const btn = w.querySelector(".combo-btn-nuevo");
+      input.disabled = !hayCliente;
+      btn.disabled = !hayCliente;
+      input.placeholder = hayCliente ? "Buscar..." : "Elige un cliente primero...";
+    });
+  }
+
+  selectCliente.addEventListener("change", function () {
+    filtrarEquiposPorCliente();
+    filtrarUbicacionesPorCliente();
+    actualizarDisponibilidadDependientes();
+    comboEquipo.sincronizarDesdeSelect();
+    comboUbicacion.sincronizarDesdeSelect();
+  });
+  filtrarEquiposPorCliente();
+  filtrarUbicacionesPorCliente();
+  actualizarDisponibilidadDependientes();
+
+  // Técnico (Cuadrilla) y Producto (Materiales): mismo combobox, pero por fila de formset —
+  // puede haber varias filas a la vez, y se agregan nuevas dinámicamente. Ninguno depende de
+  // otro campo, así que "+ Nuevo" nunca está deshabilitado.
+  // --- Catálogo reutilizable (Mano de obra/Logística/Equipos/Alcance/Exclusiones/Provisiones):
+  // texto libre con sugerencias por categoría; "+ Nuevo" guarda en el catálogo vía fetch y
+  // deja el texto disponible de inmediato para las demás filas, sin recargar la página. ---
+  let catalogoItems = {};
+  try {
+    catalogoItems = JSON.parse(document.getElementById("catalogo-items-json").textContent);
+  } catch (e) { catalogoItems = {}; }
+
+  function inicializarCombosTextoLibre(contenedor) {
+    contenedor.querySelectorAll(".combo-fila-texto").forEach(function (wrapper) {
+      if (wrapper._comboTextoListo) return;
+      wrapper._comboTextoListo = true;
+      const tipo = wrapper.dataset.tipo;
+      const input = wrapper.querySelector("input[type=text]");
+      const lista = wrapper.querySelector(".combo-lista");
+      const btnNuevo = wrapper.querySelector(".combo-btn-nuevo");
+      if (!input) return;
+
+      function cerrarLista() { lista.hidden = true; lista.innerHTML = ""; }
+
+      function crear(texto) {
+        if (!texto) return;
+        fetch("{% url 'cotizaciones:crear_item_catalogo_rapido' %}", {
+          method: "POST",
+          headers: { "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value, "Content-Type": "application/x-www-form-urlencoded" },
+          body: "tipo=" + encodeURIComponent(tipo) + "&texto=" + encodeURIComponent(texto),
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (datos) {
+            if (datos.label) {
+              input.value = datos.label;
+              if (!catalogoItems[tipo]) catalogoItems[tipo] = [];
+              if (catalogoItems[tipo].indexOf(datos.label) === -1) catalogoItems[tipo].push(datos.label);
+              input.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+          });
+      }
+
+      function renderizarLista(filtro) {
+        const texto = filtro.trim().toLowerCase();
+        const opciones = (catalogoItems[tipo] || []).filter(function (o) { return o.toLowerCase().includes(texto); });
+        lista.innerHTML = "";
+        opciones.forEach(function (opcion) {
+          const li = document.createElement("li");
+          li.textContent = opcion;
+          li.addEventListener("mousedown", function (e) {
+            e.preventDefault();
+            input.value = opcion;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            cerrarLista();
+          });
+          lista.appendChild(li);
+        });
+        if (opciones.length === 0) {
+          const li = document.createElement("li");
+          li.className = "combo-sin-resultados";
+          li.textContent = "Sin coincidencias en el catálogo.";
+          lista.appendChild(li);
+        }
+        if (filtro.trim()) {
+          const liCrear = document.createElement("li");
+          liCrear.className = "combo-opcion-crear";
+          liCrear.textContent = "+ Agregar \"" + filtro.trim() + "\" al catálogo";
+          liCrear.addEventListener("mousedown", function (e) {
+            e.preventDefault();
+            cerrarLista();
+            crear(filtro.trim());
+          });
+          lista.appendChild(liCrear);
+        }
+        lista.hidden = false;
+      }
+
+      input.addEventListener("focus", function () { renderizarLista(input.value); });
+      input.addEventListener("input", function () { renderizarLista(input.value); });
+      input.addEventListener("blur", function () { setTimeout(cerrarLista, 150); });
+      btnNuevo.addEventListener("click", function () { crear(input.value.trim()); });
+    });
+  }
+
+  let comboFilaActiva = null; // qué fila abrió el modal, para saber dónde seleccionar el nuevo valor
+  let elaboradoPorPendiente = false; // "Elaborado por" no tiene <select> propio (es texto libre)
+
+  // "Elaborado por": texto libre (no FK), pero sugiere nombres de técnicos ya cargados en la
+  // página (los mismos options de Cuadrilla) y reutiliza el modal de técnico para "+ Nuevo".
+  (function () {
+    const wrapper = document.querySelector('.combo-buscar[data-tipo="elaborado_por"]');
+    if (!wrapper) return;
+    const input = wrapper.querySelector("input[type=text]");
+    const lista = wrapper.querySelector(".combo-lista");
+    const btnNuevo = wrapper.querySelector(".combo-btn-nuevo");
+
+    function nombresTecnicos() {
+      const selectTecnico = document.querySelector("select[name$='-tecnico']");
+      if (!selectTecnico) return [];
+      return Array.from(selectTecnico.options).filter(function (o) { return o.value; }).map(function (o) { return o.textContent.trim(); });
+    }
+
+    function cerrarLista() { lista.hidden = true; lista.innerHTML = ""; }
+
+    function renderizarLista(filtro) {
+      const texto = filtro.trim().toLowerCase();
+      const coincidencias = nombresTecnicos().filter(function (n) { return n.toLowerCase().includes(texto); });
+      lista.innerHTML = "";
+      coincidencias.forEach(function (nombre) {
+        const li = document.createElement("li");
+        li.textContent = nombre;
+        li.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+          input.value = nombre;
+          cerrarLista();
+        });
+        lista.appendChild(li);
+      });
+      if (coincidencias.length === 0) {
+        const li = document.createElement("li");
+        li.className = "combo-sin-resultados";
+        li.textContent = "Sin coincidencias entre los técnicos ya cargados.";
+        lista.appendChild(li);
+      }
+      lista.hidden = false;
+    }
+
+    input.addEventListener("focus", function () { renderizarLista(""); });
+    input.addEventListener("input", function () { renderizarLista(input.value); });
+    input.addEventListener("blur", function () { setTimeout(cerrarLista, 150); });
+    btnNuevo.addEventListener("click", function () {
+      elaboradoPorPendiente = true;
+      abrirModal("modal-tecnico", { nombres: input.value });
+    });
+  })();
+
+  function inicializarCombosDeFila(contenedor) {
+    contenedor.querySelectorAll('.combo-fila[data-tipo="tecnico"]').forEach(function (wrapper) {
+      inicializarComboEnElemento(wrapper, {
+        etiqueta: "técnico",
+        mensajeVacio: "No hay técnicos todavía.",
+        abrirModal: function (texto) {
+          comboFilaActiva = wrapper;
+          abrirModal("modal-tecnico", { nombres: texto });
+        },
+      });
+    });
+    contenedor.querySelectorAll('.combo-fila[data-tipo="producto"]').forEach(function (wrapper) {
+      inicializarComboEnElemento(wrapper, {
+        etiqueta: "producto",
+        mensajeVacio: "No hay productos todavía.",
+        abrirModal: function (texto) {
+          comboFilaActiva = wrapper;
+          abrirModal("modal-producto", { nombre: texto });
+        },
+      });
+    });
+  }
+
+  // --- Modales de creación rápida ---
+  function abrirModal(id, valoresIniciales) {
+    const overlay = document.getElementById(id);
+    const form = overlay.querySelector("form");
+    form.reset();
+    overlay.querySelector(".error-modal").hidden = true;
+    Object.keys(valoresIniciales || {}).forEach(function (campo) {
+      const input = form.querySelector('[name="' + campo + '"]');
+      if (input) input.value = valoresIniciales[campo];
+    });
+    const campoCliente = form.querySelector('input[name="cliente"]');
+    if (campoCliente) campoCliente.value = selectCliente.value;
+    overlay.hidden = false;
+    const primerCampo = form.querySelector("input[type=text], select");
+    if (primerCampo) primerCampo.focus();
+  }
+
+  function cerrarModal(overlay) { overlay.hidden = true; }
+
+  function agregarOpcion(select, valor, texto, clienteId) {
+    const opcion = document.createElement("option");
+    opcion.value = valor;
+    opcion.textContent = texto;
+    if (clienteId !== undefined) opcion.dataset.cliente = String(clienteId);
+    select.appendChild(opcion);
+  }
+
+  function configurarModal(overlayId, url, alExito) {
+    const overlay = document.getElementById(overlayId);
+    const form = overlay.querySelector("form");
+    const errorP = overlay.querySelector(".error-modal");
+
+    overlay.querySelector(".btn-cancelar-modal").addEventListener("click", function () { cerrarModal(overlay); });
+    overlay.addEventListener("mousedown", function (e) { if (e.target === overlay) cerrarModal(overlay); });
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      errorP.hidden = true;
+      fetch(url, { method: "POST", body: new FormData(form) })
+        .then(function (r) { return r.json().then(function (datos) { return { ok: r.ok, datos: datos }; }); })
+        .then(function (resultado) {
+          if (!resultado.ok) {
+            const mensajes = Object.values(resultado.datos.errors || {}).flat();
+            errorP.textContent = mensajes.join(" ") || "No se pudo crear. Revisa los datos.";
+            errorP.hidden = false;
+            return;
+          }
+          alExito(resultado.datos);
+          cerrarModal(overlay);
+        })
+        .catch(function () {
+          errorP.textContent = "Error de conexión. Intenta de nuevo.";
+          errorP.hidden = false;
+        });
+    });
+  }
+
+  configurarModal("modal-cliente", "{% url 'cotizaciones:crear_cliente_rapido' %}", function (datos) {
+    agregarOpcion(selectCliente, datos.id, datos.label);
+    selectCliente.value = datos.id;
+    selectCliente.dispatchEvent(new Event("change", { bubbles: true }));
+    comboCliente.sincronizarDesdeSelect();
+  });
+  configurarModal("modal-equipo", "{% url 'cotizaciones:crear_equipo_rapido' %}", function (datos) {
+    agregarOpcion(selectEquipo, datos.id, datos.label, datos.cliente_id);
+    selectEquipo.value = datos.id;
+    selectEquipo.dispatchEvent(new Event("change", { bubbles: true }));
+    comboEquipo.sincronizarDesdeSelect();
+  });
+  configurarModal("modal-ubicacion", "{% url 'cotizaciones:crear_ubicacion_rapido' %}", function (datos) {
+    agregarOpcion(selectUbicacion, datos.id, datos.label, datos.cliente_id);
+    selectUbicacion.value = datos.id;
+    selectUbicacion.dispatchEvent(new Event("change", { bubbles: true }));
+    comboUbicacion.sincronizarDesdeSelect();
+  });
+
+  // Técnico/Producto: el nuevo registro se agrega a TODAS las filas del mismo tipo (para que
+  // aparezca al buscar en cualquiera), y se selecciona solo en la fila que abrió el modal.
+  function agregarOpcionATodasLasFilas(nombreCampo, valor, texto) {
+    document.querySelectorAll("select[name$='-" + nombreCampo + "']").forEach(function (select) {
+      agregarOpcion(select, valor, texto);
+    });
+  }
+
+  configurarModal("modal-tecnico", "{% url 'cotizaciones:crear_tecnico_rapido' %}", function (datos) {
+    agregarOpcionATodasLasFilas("tecnico", datos.id, datos.label);
+    if (elaboradoPorPendiente) {
+      document.querySelector('.combo-buscar[data-tipo="elaborado_por"] input[type=text]').value = datos.label;
+      elaboradoPorPendiente = false;
+    } else if (comboFilaActiva) {
+      const select = comboFilaActiva.querySelector("select");
+      select.value = datos.id;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      comboFilaActiva._comboApi.sincronizarDesdeSelect();
+      comboFilaActiva = null;
+    }
+  });
+
+  configurarModal("modal-producto", "{% url 'cotizaciones:crear_producto_rapido' %}", function (datos) {
+    document.querySelectorAll("select[name$='-producto']").forEach(function (select) {
+      const opcion = document.createElement("option");
+      opcion.value = datos.id;
+      opcion.textContent = datos.label;
+      opcion.dataset.precio = datos.precio;
+      opcion.dataset.moneda = datos.moneda;
+      select.appendChild(opcion);
+    });
+    if (comboFilaActiva) {
+      const select = comboFilaActiva.querySelector("select");
+      select.value = datos.id;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      comboFilaActiva._comboApi.sincronizarDesdeSelect();
+      comboFilaActiva = null;
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base_shell.html" %}
+
+{% block title %}Clientes{% endblock %}
+
+{% block encabezado %}Clientes{% endblock %}
+
+{% block content %}
+<div class="tarjeta-seccion">
+  <div class="barra-acciones">
+    <form method="get" class="buscador">
+      <input type="text" name="q" value="{{ q }}" placeholder="Buscar por razón social, RUC o código...">
+      <button type="submit">Buscar</button>
+    </form>
+    <div>
+      <a href="{% url 'clientes:importar' %}"><button type="button" class="secundario">Importar desde Excel</button></a>
+      <a href="{% url 'clientes:nuevo' %}"><button type="button">+ Nuevo cliente</button></a>
+    </div>
+  </div>
+
+  <table class="mediciones">
+    <tr><th>Razón social</th><th>RUC</th><th>Código corto</th><th>Contacto</th><th></th></tr>
+    {% for c in clientes %}
+    <tr>
+      <td>{{ c.razon_social }}</td>
+      <td>{{ c.ruc|default:"—" }}</td>
+      <td>{{ c.codigo_corto }}</td>
+      <td>{{ c.contacto_nombre|default:"—" }}</td>
+      <td class="acciones">
+        <a class="enlace-accion" href="{% url 'clientes:editar' c.pk %}">Editar</a>
+        · <a class="enlace-accion peligro" href="{% url 'clientes:eliminar' c.pk %}">Eliminar</a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5">Sin clientes registrados{% if q %} para "{{ q }}"{% endif %}.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

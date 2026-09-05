@@ -1,0 +1,44 @@
+{% extends "base_shell.html" %}
+
+{% block title %}Cotizaciones{% endblock %}
+
+{% block encabezado %}Cotizaciones{% endblock %}
+
+{% block content %}
+<div class="tarjeta-seccion">
+  <div class="barra-acciones">
+    <form method="get" class="buscador">
+      <input type="text" name="q" value="{{ q }}" placeholder="Buscar por código o cliente...">
+      <button type="submit">Buscar</button>
+    </form>
+    <a href="{% url 'cotizaciones:nueva' %}"><button type="button">+ Nueva cotización</button></a>
+  </div>
+
+  <table class="mediciones">
+    <tr><th>Código</th><th>Cliente</th><th>Tipo</th><th>Estado</th><th>Monto</th><th>Fecha de creación</th><th></th></tr>
+    {% for s in servicios %}
+    <tr>
+      <td>{{ s.codigo }}</td>
+      <td>{{ s.cliente.razon_social }}</td>
+      <td>{{ s.get_tipo_servicio_display }}</td>
+      <td><span class="badge-flujo badge-flujo-{{ s.estado }}">{{ s.get_estado_display }}</span></td>
+      <td>{{ s.monto_total }} {{ s.moneda }}</td>
+      <td>{{ s.creado_en|date:"d/m/Y" }}</td>
+      <td class="acciones">
+        {% if s.estado == "aprobado" %}
+          <form method="post" action="{% url 'cotizaciones:iniciar_servicio' s.pk %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="secundario" style="margin:0; padding:.3rem .6rem; font-size:.8rem;" title="Pasa el servicio a 'En ejecución' y abre el checklist">▶ Iniciar servicio</button>
+          </form>
+          ·
+        {% endif %}
+        <a class="enlace-accion" href="{% url 'cotizaciones:editar' s.pk %}">Editar</a>
+        · <a class="enlace-accion" href="{% url 'dashboard:detalle_servicio' s.pk %}">Ver detalle</a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7">Sin cotizaciones registradas{% if q %} para "{{ q }}"{% endif %}.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

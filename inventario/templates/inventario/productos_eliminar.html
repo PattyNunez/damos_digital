@@ -1,0 +1,17 @@
+{% extends "base_shell.html" %}
+
+{% block title %}Eliminar producto{% endblock %}
+
+{% block encabezado %}Eliminar producto{% endblock %}
+
+{% block content %}
+<div class="tarjeta-seccion">
+  <p>¿Confirmas eliminar <strong>{{ producto.codigo }} - {{ producto.nombre }}</strong>? Esta acción no se puede deshacer.</p>
+  <p class="ayuda">Si este producto ya fue usado en una cotización, considera desactivarlo en vez de eliminarlo.</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="peligro">Sí, eliminar</button>
+    <a class="enlace-volver" href="{% url 'inventario:productos' %}" style="margin-left:1rem;">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

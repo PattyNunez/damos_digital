@@ -1,0 +1,17 @@
+{% extends "base_shell.html" %}
+
+{% block title %}Eliminar proveedor{% endblock %}
+
+{% block encabezado %}Eliminar proveedor{% endblock %}
+
+{% block content %}
+<div class="tarjeta-seccion">
+  <p>¿Confirmas eliminar a <strong>{{ proveedor.razon_social }}</strong>? Esta acción no se puede deshacer.</p>
+  <p class="ayuda">Si este proveedor ya tiene productos asociados, considera desactivarlo en vez de eliminarlo.</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="peligro">Sí, eliminar</button>
+    <a class="enlace-volver" href="{% url 'inventario:proveedores' %}" style="margin-left:1rem;">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

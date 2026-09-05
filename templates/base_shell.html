@@ -1,0 +1,292 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Damol Digital{% endblock %} · Damol Digital</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif; margin: 0; font-size: 15px;
+    color: #222; background: #f2f2f2;
+  }
+  a { color: inherit; }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* --- Sidebar --- */
+  .sidebar { width: 230px; flex-shrink: 0; background: #1a1a1a; color: #cfd2d6; display: flex; flex-direction: column; }
+  .sidebar-marca { padding: 1.5rem 1.1rem; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .sidebar-marca img { max-width: 100%; height: auto; display: block; }
+  .nav-lateral { padding: .75rem 0; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: .7rem; padding: .7rem 1.1rem;
+    font-size: .88rem; text-decoration: none; color: #b0bac6;
+    border-left: 3px solid transparent;
+  }
+  .nav-item:hover { background: rgba(255,255,255,.05); color: #fff; }
+  .nav-item.activo { background: rgba(255,153,0,.12); color: #fff; border-left-color: #FF9900; font-weight: 600; }
+  .nav-item.proximamente { cursor: default; color: #6b7280; }
+  .nav-item.proximamente:hover { background: none; color: #6b7280; }
+  .nav-item .icono-nav { width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
+  .nav-item .icono-nav svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .etiqueta-proximamente {
+    margin-left: auto; font-size: .62rem; text-transform: uppercase; letter-spacing: .03em;
+    background: rgba(255,255,255,.08); color: #8a95a3; padding: .1rem .4rem; border-radius: 999px;
+  }
+  .sidebar-pie { padding: 1rem 1.1rem; font-size: .7rem; color: #6b7684; border-top: 1px solid rgba(255,255,255,.08); }
+
+  /* --- Main / topbar --- */
+  .principal { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .topbar {
+    background: #fff; border-bottom: 1px solid #e1e4e8; padding: .9rem 1.6rem;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .topbar h1 { font-size: 1.1rem; font-weight: 600; margin: 0; color: #1a1a1a; }
+  .chip-usuario { display: flex; align-items: center; gap: .55rem; font-size: .82rem; color: #666; }
+  .chip-usuario .avatar {
+    width: 1.8rem; height: 1.8rem; border-radius: 50%; background: #FF9900; color: #1a1a1a;
+    display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700;
+  }
+  .chip-usuario form { display:inline; margin:0; }
+  .enlace-cerrar-sesion {
+    background:none; border:none; color:#888; text-decoration:underline; font-size:.8rem;
+    padding:0; margin:0; cursor:pointer; font-weight:400;
+  }
+  .enlace-cerrar-sesion:hover { color:var(--rojo-damol); filter:none; }
+  /* Mismo gotcha de min-width:auto que ya resolví en .tarjeta-indicador, un nivel más arriba:
+     .contenido es un flex item de .principal (columna), y sin min-width:0 se niega a
+     encogerse por debajo del ancho mínimo de su contenido (la tabla ancha), forzando overflow
+     en vez de dejar que la tabla scrollee. Hay que cortarlo en cada nivel de la cadena flex. */
+  .contenido { padding: 1.6rem; flex: 1; min-width: 0; }
+  .mensajes { margin-bottom: 1rem; padding: 0; }
+  .mensajes li { list-style: none; padding: .65rem; border-radius: 6px; margin-bottom: .4rem; }
+  .mensajes .success { background: #d4f4dd; color: #0a5c2b; }
+  .mensajes .error { background: #fbdcdc; color: #8a1c1c; }
+  .ayuda { color: #777; font-size: .85rem; margin-top: .2rem; }
+  table.mediciones { border-collapse: collapse; width: 100%; margin-top: .5rem; display: block; overflow-x: auto; }
+  table.mediciones th, table.mediciones td { border: 1px solid #ddd; padding: .45rem; text-align: center; white-space: nowrap; }
+
+  /* ============================================================
+     Identidad visual Dashboard / Kanban / Shell (Módulos 4-6+).
+     Naranja de marca real de Damol (#FF9900, confirmado en el .docx JP-F-007) + gris oscuro.
+     ============================================================ */
+  :root {
+    --naranja-damol: #FF9900;
+    --naranja-damol-suave: #FFE7BF;
+    --verde-damol: #92D050;
+    --amarillo-damol: #FFFF00;
+    --rojo-damol: #FF0000;
+    --gris-oscuro: #212529;
+  }
+  .enlace-volver { display:inline-block; margin-bottom:1rem; color:var(--gris-oscuro); text-decoration:none; font-size:.9rem; }
+  .enlace-volver:hover { text-decoration:underline; }
+
+  /* --- Tarjetas de indicador (Dashboard) --- */
+  .rejilla-indicadores { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem; }
+  /* Esta tarjeta tiene una tabla de 3 columnas con etiquetas largas: con 1 columna de grid le
+     faltaban ~36px y quedaba con scroll horizontal interno no evidente (nada visible que
+     indique que se puede scrollear). El doble de ancho evita necesitar ese scroll. */
+  .tarjeta-ancha { grid-column: span 2; }
+  .tarjeta-indicador {
+    background:#fff; border-radius:10px; padding:1.25rem 1.4rem; box-shadow:0 1px 4px rgba(0,0,0,.08);
+    border-top:3px solid var(--naranja-damol);
+    min-width: 0;
+  }
+  .tarjeta-indicador .encabezado-tarjeta { display:flex; align-items:center; gap:.7rem; margin-bottom:1rem; }
+  .tarjeta-indicador .icono-indicador {
+    width:2.3rem; height:2.3rem; border-radius:50%; background:var(--naranja-damol-suave);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .tarjeta-indicador .icono-indicador svg { width:1.3rem; height:1.3rem; stroke:var(--naranja-damol); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .tarjeta-indicador h2 { margin:0; font-size:1.05rem; color:var(--gris-oscuro); }
+  .tarjeta-indicador table.mediciones { margin-top:0; }
+  /* Envolver la tabla en un contenedor con overflow-x, en vez de poner display:block +
+     overflow directo en el <table>, que en Chrome real (confirmado con headless, no solo mi
+     proxy) dejaba que el contenido se saliera de la tarjeta en vez de scrollear o recortarse. */
+  .tabla-scroll { overflow-x: auto; }
+  /* table.tabla-transiciones (elemento+clase) empata en especificidad con table.mediciones
+     y gana por orden de aparición (está después) — .tabla-transiciones sola perdía siempre. */
+  table.tabla-transiciones { display: table; overflow-x: visible; width: 100%; }
+  .tabla-transiciones th:first-child, .tabla-transiciones td:first-child { white-space: normal; }
+  .fila-total td { font-weight:700; background:#faf6ec; }
+  .dato-destacado { font-size:1.4rem; font-weight:700; color:var(--gris-oscuro); }
+
+  /* --- Tarjeta de Alertas automáticas (dashboard) --- */
+  .tarjeta-alerta { border-top-color: var(--rojo-damol); }
+  .tarjeta-alerta .icono-alerta { background:#ffe0e0; }
+  .tabla-alertas td, .tabla-alertas th { white-space:nowrap; }
+
+  /* --- Barras horizontales (CSS puro, sin librería de gráficos) --- */
+  .barra-horizontal { display:flex; align-items:center; gap:.6rem; padding:.4rem 0; }
+  .barra-horizontal .etiqueta-barra {
+    width:9.5rem; flex-shrink:0; font-size:.83rem; color:var(--gris-oscuro);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .barra-horizontal .pista-barra { flex:1; height:.65rem; background:#eef0f2; border-radius:999px; overflow:hidden; min-width:0; }
+  .barra-horizontal .relleno-barra { display:block; height:100%; border-radius:999px; }
+  .barra-horizontal .valor-barra { width:2rem; flex-shrink:0; text-align:right; font-weight:700; font-size:.85rem; color:var(--gris-oscuro); }
+
+  .relleno-estado-cotizado { background:#6b7280; }
+  .relleno-estado-aprobado { background:#2563eb; }
+  .relleno-estado-en_ejecucion { background:var(--naranja-damol); }
+  .relleno-estado-entregado { background:var(--verde-damol); }
+  .relleno-cliente { background:var(--naranja-damol); }
+
+  /* --- Kanban --- */
+  .kanban { display:flex; gap:1rem; overflow-x:auto; align-items:flex-start; padding-bottom:.5rem; }
+  .columna-kanban { flex:1 1 240px; min-width:240px; background:#f0f1f3; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .columna-kanban .cabecera-columna {
+    padding:.7rem .9rem; font-weight:700; color:#fff; display:flex; align-items:center; justify-content:space-between;
+  }
+  .columna-kanban .contador-columna { background:rgba(255,255,255,.3); padding:.1rem .55rem; border-radius:999px; font-size:.8rem; }
+  .columna-kanban .cuerpo-columna { padding:.75rem; }
+  .columna-cotizado .cabecera-columna { background:#6b7280; }
+  .columna-cotizado .tarjeta-kanban { border-left-color:#6b7280; }
+  .columna-aprobado .cabecera-columna { background:#2563eb; }
+  .columna-aprobado .tarjeta-kanban { border-left-color:#2563eb; }
+  .columna-en_ejecucion .cabecera-columna { background:var(--naranja-damol); color:#1a1a1a; }
+  .columna-en_ejecucion .tarjeta-kanban { border-left-color:var(--naranja-damol); }
+  .columna-entregado .cabecera-columna { background:var(--verde-damol); color:#1a1a1a; }
+  .columna-entregado .tarjeta-kanban { border-left-color:var(--verde-damol); }
+
+  .tarjeta-kanban {
+    display:block; background:#fff; border-radius:8px; padding:.75rem .85rem; margin-bottom:.6rem;
+    text-decoration:none; color:#222; box-shadow:0 1px 2px rgba(0,0,0,.1);
+    border-left:4px solid transparent; transition:box-shadow .15s ease, transform .15s ease;
+  }
+  .tarjeta-kanban:hover { box-shadow:0 5px 12px rgba(0,0,0,.16); transform:translateY(-2px); }
+  .tarjeta-kanban strong { display:block; margin-bottom:.2rem; color:var(--gris-oscuro); }
+  .tarjeta-kanban .monto-tarjeta { color:#666; font-size:.85rem; margin-top:.15rem; }
+  .sin-tarjetas { color:#888; font-size:.85rem; }
+  .badge-alerta {
+    display:inline-block; background:var(--rojo-damol); color:#fff; font-size:.72rem; font-weight:700;
+    padding:.12rem .5rem; border-radius:999px; margin-bottom:.35rem;
+  }
+
+  /* --- Badges de estado de flujo (Servicio.estado), mismos colores que el kanban --- */
+  .badge-flujo { display:inline-block; padding:.2rem .65rem; border-radius:999px; font-size:.8rem; font-weight:700; color:#fff; }
+  .badge-flujo-cotizado { background:#6b7280; }
+  .badge-flujo-aprobado { background:#2563eb; }
+  .badge-flujo-en_ejecucion { background:var(--naranja-damol); color:#1a1a1a; }
+  .badge-flujo-entregado { background:var(--verde-damol); color:#1a1a1a; }
+
+  /* --- Badges de estado de checklist: colores reales del documento. El amarillo de
+     "Regular" es amarillo puro, NO el mismo naranja de marca. --- */
+  .badge-estado { display:inline-block; padding:.15rem .55rem; border-radius:6px; font-size:.8rem; font-weight:700; }
+  .badge-estado-B { background:var(--verde-damol); color:#1a1a1a; }
+  .badge-estado-R { background:var(--amarillo-damol); color:#1a1a1a; }
+  .badge-estado-M { background:var(--rojo-damol); color:#fff; }
+  .badge-estado-NA { background:#e0e0e0; color:#555; }
+
+  /* --- Tarjetas de sección (página de detalle) --- */
+  .tarjeta-seccion { background:#fff; border-radius:10px; padding:1.25rem 1.4rem; margin-bottom:1.5rem; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .tarjeta-seccion h2 { color:var(--gris-oscuro); border-bottom:2px solid var(--naranja-damol); padding-bottom:.4rem; display:inline-block; margin-bottom:1rem; }
+  .tarjeta-seccion h3 { color:var(--gris-oscuro); margin-top:1.2rem; }
+  .cabecera-servicio { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; align-items:center; margin-bottom:.3rem; }
+  .cabecera-servicio .monto-servicio { font-size:1.1rem; font-weight:700; color:var(--gris-oscuro); }
+
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+  }
+
+  /* --- Controles de formulario genéricos (CRUDs: Clientes, Catálogo, Cotizaciones) --- */
+  label { display:block; font-weight:600; margin-top:.9rem; margin-bottom:.3rem; font-size:.85rem; color:var(--gris-oscuro); }
+  input[type=text], input[type=email], input[type=tel], input[type=number], input[type=password], textarea, select {
+    width:100%; padding:.55rem .7rem; font-size:.9rem; border:1px solid #d5d8dc; border-radius:6px; background:#fff; font-family:inherit;
+  }
+  input[type=file] { margin-top:.3rem; }
+  input[type=checkbox] { width:auto; }
+  input:disabled, textarea:disabled, select:disabled {
+    background:#eef0f2; color:#6b7280; cursor:not-allowed;
+  }
+  button, input[type=submit] {
+    background:var(--naranja-damol); color:#1a1a1a; border:none; padding:.65rem 1.1rem;
+    font-size:.9rem; font-weight:600; border-radius:6px; cursor:pointer; margin-top:.6rem; font-family:inherit;
+  }
+  button:hover { filter:brightness(0.95); }
+  button.secundario { background:#e5e7eb; color:var(--gris-oscuro); }
+  button.peligro { background:var(--rojo-damol); color:#fff; }
+  .barra-acciones { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap:1rem; flex-wrap:wrap; }
+  .buscador { display:flex; gap:.5rem; }
+  .buscador input { width:260px; }
+  .fila-formset { border-top:1px solid #eee; padding-top:.75rem; margin-top:.75rem; }
+  .enlace-accion { color:var(--naranja-damol); text-decoration:none; font-weight:600; font-size:.85rem; }
+  .enlace-accion.peligro { color:var(--rojo-damol); }
+  table.mediciones td.acciones { white-space:nowrap; }
+  .subnav { font-size:.9rem; color:#666; margin-bottom:1rem; }
+  .subnav strong { color:var(--gris-oscuro); }
+  code { background:#f0f1f3; padding:.1rem .35rem; border-radius:4px; font-size:.85em; }
+</style>
+{% block extra_style %}{% endblock %}
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-marca">
+      <img src="{% static 'reportes/damol_logo_transparente.png' %}" alt="Damol Ingenieros">
+    </div>
+
+    <nav class="nav-lateral">
+      {% if request.user.is_superuser or request.user.perfil.rol == "administrador" %}
+      <a class="nav-item{% if request.resolver_match.url_name == 'inicio' %} activo{% endif %}" href="{% url 'dashboard:inicio' %}">
+        <span class="icono-nav"><svg viewBox="0 0 24 24"><path d="M4 20V10M12 20V4M20 20v-7"/></svg></span>
+        Indicadores
+      </a>
+      {% endif %}
+      {% if request.user.is_superuser or request.user.perfil.rol == "comercial" or request.user.perfil.rol == "administrador" %}
+      <a class="nav-item{% if request.resolver_match.app_name == 'cotizaciones' %} activo{% endif %}" href="{% url 'cotizaciones:lista' %}">
+        <span class="icono-nav"><svg viewBox="0 0 24 24"><path d="M9 7h6M9 11h6M9 15h3"/><rect x="4" y="3" width="16" height="18" rx="1.5"/></svg></span>
+        Cotizaciones
+      </a>
+      {% endif %}
+      {% if request.user.is_superuser or request.user.perfil.rol == "administrador" %}
+      <a class="nav-item{% if '/dashboard/kanban' in request.path %} activo{% endif %}" href="{% url 'dashboard:kanban' %}">
+        <span class="icono-nav"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/></svg></span>
+        Seguimiento
+      </a>
+      {% endif %}
+      {% if request.user.is_superuser or request.user.perfil.rol == "administrador" %}
+      <a class="nav-item{% if request.resolver_match.app_name == 'inventario' %} activo{% endif %}" href="{% url 'inventario:productos' %}">
+        <span class="icono-nav"><svg viewBox="0 0 24 24"><path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg></span>
+        Catálogo / Inventario
+      </a>
+      {% endif %}
+      {% if request.user.is_superuser or request.user.perfil.rol == "comercial" or request.user.perfil.rol == "administrador" %}
+      <a class="nav-item{% if request.resolver_match.app_name == 'clientes' %} activo{% endif %}" href="{% url 'clientes:lista' %}">
+        <span class="icono-nav"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><circle cx="17.5" cy="9" r="2.3"/><path d="M15.5 20c.2-2.2 2-4 5-4"/></svg></span>
+        Clientes
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-pie">Damol Digital · v0.1</div>
+  </div>
+
+  <div class="principal">
+    <div class="topbar">
+      <h1>{% block encabezado %}{% endblock %}</h1>
+      {% if request.user.is_authenticated %}
+      <div class="chip-usuario">
+        <span class="avatar">{{ request.user.username|slice:":2"|upper }}</span>
+        {{ request.user.username }}
+        <form method="post" action="{% url 'cuentas:logout' %}">{% csrf_token %}<button type="submit" class="enlace-cerrar-sesion">Cerrar sesión</button></form>
+      </div>
+      {% endif %}
+    </div>
+    <div class="contenido">
+      {% if messages %}
+      <ul class="mensajes">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% block extra_script %}{% endblock %}
+</body>
+</html>

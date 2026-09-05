@@ -1,0 +1,22 @@
+<tr class="fila-item{% if form.DELETE.value %} fila-eliminada{% endif %}">
+  {{ form.id }}
+  <td>
+    <div class="combo-buscar combo-fila" data-tipo="tecnico">
+      {{ form.tecnico }}
+      <div class="combo-caja">
+        <input type="text" class="combo-input" placeholder="Buscar técnico..." autocomplete="off">
+        <button type="button" class="combo-btn-nuevo">+ Nuevo</button>
+      </div>
+      <ul class="combo-lista" hidden></ul>
+    </div>
+    {% if not form.DELETE.value %}{{ form.tecnico.errors }}{% endif %}
+  </td>
+  <td>
+    {{ form.rol }}
+    {% if not form.DELETE.value %}{{ form.rol.errors }}{% endif %}
+  </td>
+  <td>
+    {{ form.DELETE }}
+    <button type="button" class="btn-eliminar-fila" title="Eliminar línea">&times;</button>
+  </td>
+</tr>

@@ -1,0 +1,41 @@
+{% extends "base_shell.html" %}
+
+{% block title %}{% if proveedor %}Editar proveedor{% else %}Nuevo proveedor{% endif %}{% endblock %}
+
+{% block encabezado %}{% if proveedor %}Editar proveedor{% else %}Nuevo proveedor{% endif %}{% endblock %}
+
+{% block content %}
+<p><a class="enlace-volver" href="{% url 'inventario:proveedores' %}">&larr; Volver a proveedores</a></p>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="tarjeta-seccion">
+    <h2>Datos del proveedor</h2>
+
+    <label for="{{ form.razon_social.id_for_label }}">Razón social</label>
+    {{ form.razon_social }}
+    {{ form.razon_social.errors }}
+
+    <label for="{{ form.ruc.id_for_label }}">RUC</label>
+    {{ form.ruc }}
+    {{ form.ruc.errors }}
+
+    <label for="{{ form.direccion.id_for_label }}">Dirección</label>
+    {{ form.direccion }}
+
+    <label for="{{ form.contacto_nombre.id_for_label }}">Nombre de contacto</label>
+    {{ form.contacto_nombre }}
+
+    <label for="{{ form.contacto_telefono.id_for_label }}">Teléfono de contacto</label>
+    {{ form.contacto_telefono }}
+
+    <label for="{{ form.contacto_email.id_for_label }}">Correo de contacto</label>
+    {{ form.contacto_email }}
+    {{ form.contacto_email.errors }}
+
+    <label for="{{ form.activo.id_for_label }}">{{ form.activo }} Proveedor activo</label>
+  </div>
+
+  <button type="submit">Guardar proveedor</button>
+</form>
+{% endblock %}

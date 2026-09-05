@@ -1,0 +1,19 @@
+<li class="fila-item fila-texto{% if form.DELETE.value %} fila-eliminada{% endif %}">
+  {{ form.id }}
+  {{ form.orden }}
+  <span class="bullet-item">&bull;</span>
+  <div class="combo-buscar combo-texto-libre combo-fila-texto" data-tipo="{{ tipo }}">
+    <div class="combo-caja">
+      {{ form.texto }}
+      <button type="button" class="combo-btn-nuevo">+ Agregar nueva</button>
+    </div>
+    <ul class="combo-lista" hidden></ul>
+  </div>
+  {% if not form.DELETE.value %}{{ form.texto.errors }}{% endif %}
+  <span class="acciones-fila-texto">
+    <button type="button" class="btn-mover-arriba" title="Subir">&#9650;</button>
+    <button type="button" class="btn-mover-abajo" title="Bajar">&#9660;</button>
+    {{ form.DELETE }}
+    <button type="button" class="btn-eliminar-fila" title="Eliminar línea">&times;</button>
+  </span>
+</li>

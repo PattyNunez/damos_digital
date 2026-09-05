@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>{{ servicio.codigo }}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 2.3cm 1.6cm 2cm 1.6cm;
+    @top-left {
+      content: url("{{ logo_damol_data_uri }}");
+      vertical-align: middle;
+    }
+    @top-right {
+      content: "{{ encabezado_linea }}";
+      font-size: 7.5pt;
+      color: #555;
+      vertical-align: middle;
+    }
+    @bottom-center {
+      content: "Página " counter(page) " de " counter(pages);
+      font-size: 8pt;
+      color: #777;
+    }
+  }
+  @page :first {
+    margin: 0;
+    @top-left { content: none; }
+    @top-right { content: none; }
+    @bottom-center { content: none; }
+  }
+
+  /* Paleta y tipografía reales de Damol, extraídas del .docx original (JP-F-007):
+     naranja de marca #FF9900 (86 usos confirmados en el Word), alertas rojo/amarillo puro/
+     verde claro. Century Gothic y Calibri no tienen licencia libre — Montserrat y Carlito son
+     las alternativas gratuitas de aspecto/métrica más cercana, instaladas localmente
+     (no dependen de conexión a internet en producción). */
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Carlito", "Calibri", Arial, sans-serif;
+    font-size: 10pt;
+    color: #1a1a1a;
+    line-height: 1.45;
+  }
+  h1, h2, h3 { font-family: "Montserrat", "Century Gothic", sans-serif; color: #1a1a1a; line-height: 1.25; }
+  h1 { font-size: 15pt; margin-top: 0; }
+  h2 { font-size: 12.5pt; border-bottom: 2pt solid #FF9900; padding-bottom: .15cm; margin-top: 0; }
+  h3 { font-size: 11pt; margin-bottom: .2cm; }
+  .seccion { page-break-before: always; }
+  .seccion:first-of-type { page-break-before: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: .3cm 0 .5cm 0; font-size: 9.5pt; }
+  table.datos td, table.datos th { border: 0.75pt solid #999; padding: .18cm .3cm; text-align: left; }
+  table.simple th, table.simple td { border: 0.75pt solid #999; padding: .15cm .3cm; text-align: left; }
+  table.simple th { background: #eef3f7; }
+  ul.lista-vinetas { margin: .2cm 0; padding-left: .6cm; }
+  ul.lista-vinetas li { margin-bottom: .15cm; }
+  .caption-tabla { font-size: 8.5pt; color: #555; margin-top: -.3cm; margin-bottom: .4cm; }
+
+  /* --- Portada --- */
+  .portada {
+    height: 29.7cm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .portada .encabezado-portada { padding: 1.5cm 2cm 0 2cm; }
+  .portada .marca { font-family: "Montserrat", "Century Gothic", sans-serif; font-size: 10pt; color: #555; margin-top: .3cm; }
+
+  /* Franja diagonal: un solo gradiente con paradas de color duras, sin transform/clip-path
+     (soporte limitado en WeasyPrint) — el corte diagonal sale del propio ángulo del gradiente. */
+  .portada .franja {
+    margin-top: 1.5cm;
+    padding: 2.2cm 2cm 1.6cm 2cm;
+    background: linear-gradient(155deg, #ffffff 0%, #ffffff 14%, #FF9900 24%, #FF9900 100%);
+    color: #1a1a1a;
+  }
+  .portada .titulo-tipo { font-family: "Montserrat", "Century Gothic", sans-serif; font-size: 13pt; font-weight: bold; letter-spacing: .5pt; }
+  .portada h1.titulo-informe {
+    font-size: 22pt; margin: .5cm 0 .8cm 0; text-transform: uppercase; line-height: 1.2;
+  }
+  .portada table.datos-portada { font-size: 10.5pt; }
+  .portada table.datos-portada td { border: none; padding: .12cm 0; }
+  .portada table.datos-portada td:first-child { font-weight: bold; width: 6cm; }
+
+  .portada .elaborado-por { padding: 1cm 2cm 1.5cm 2cm; }
+  .portada .elaborado-por .titulo-bloque {
+    font-size: 8.5pt; text-transform: uppercase; letter-spacing: .5pt; color: #777; margin-bottom: .2cm;
+  }
+  .portada .elaborado-por .nombre-elaborador { font-size: 10.5pt; font-weight: bold; }
+  .portada .fila-logos {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: .8cm; padding-top: .5cm; border-top: 0.75pt solid #ddd;
+  }
+  .portada .fila-logos img { max-height: 1.4cm; max-width: 5cm; }
+  .portada .pie-portada { font-size: 8.5pt; color: #777; margin-top: .3cm; }
+
+  /* --- Índice --- */
+  .toc-entry { display: flex; text-decoration: none; color: inherit; margin-bottom: .25cm; }
+  .toc-entry .toc-label { white-space: nowrap; }
+  .toc-entry .toc-relleno { flex: 1; border-bottom: 1pt dotted #999; margin: 0 .2cm 0.1cm .2cm; }
+  /* target-counter() lee attr(href) del elemento AL QUE está adjunto el pseudo-elemento:
+     tiene que ir en el <a> (que sí tiene href), no en un <span> hijo sin ese atributo. */
+  .toc-entry::after { content: target-counter(attr(href), page); }
+  .toc-entry.nivel2 { margin-left: .8cm; font-size: 9.5pt; }
+
+  /* --- Trabajos operativos --- */
+  .hallazgo { margin-bottom: .5cm; }
+  .hallazgo p { margin: 0 0 .25cm 0; }
+  .fotos-hallazgo { display: flex; flex-wrap: wrap; gap: .3cm; margin: .2cm 0 .4cm 0; }
+  .fotos-hallazgo figure { margin: 0; width: 47%; }
+  /* Una sola foto ocupa el ancho completo en vez de quedar angosta con espacio vacío al lado. */
+  .fotos-hallazgo figure:only-child { width: 100%; }
+  .fotos-hallazgo img { width: 100%; border: 0.75pt solid #ccc; display: block; }
+  .fotos-hallazgo figcaption {
+    font-size: 8.5pt; margin-top: 0; padding: .12cm .25cm;
+  }
+
+  /* --- Leyenda de niveles de alerta (bloque fijo, no depende de datos) --- */
+  .leyenda-alertas { margin: .3cm 0 .6cm 0; }
+  .leyenda-alertas .fila-alerta {
+    display: flex; align-items: stretch; margin-bottom: .12cm;
+    border: 0.75pt solid #999;
+  }
+  .leyenda-alertas .etiqueta-alerta {
+    width: 3.2cm; flex-shrink: 0; padding: .15cm .3cm;
+    font-size: 8.5pt; font-weight: bold; text-align: center;
+  }
+  .leyenda-alertas .texto-alerta {
+    padding: .15cm .3cm; font-size: 8.5pt; display: flex; align-items: center;
+  }
+
+  /* --- Datos principales del equipo --- */
+  .bloque-datos { margin-bottom: .6cm; }
+  .bloque-datos .cabecera-bloque {
+    background: #FF9900; color: #1a1a1a; font-weight: bold; font-size: 10pt;
+    padding: .2cm .35cm; margin-bottom: 0;
+  }
+  .bloque-datos table { margin-top: 0; }
+  .bloque-datos-con-foto { display: flex; gap: .5cm; align-items: flex-start; }
+  .bloque-datos-con-foto .columna-tabla { flex: 1; }
+  .bloque-datos-con-foto .columna-foto { width: 6cm; flex-shrink: 0; }
+  .bloque-datos-con-foto img { width: 100%; display: block; border: 0.75pt solid #ccc; }
+  .foto-vacia {
+    width: 100%; height: 4cm; border: 1pt dashed #bbb; display: flex;
+    align-items: center; justify-content: center; text-align: center;
+    color: #999; font-size: 8pt; padding: .2cm;
+  }
+  /* Especificaciones de polipasto y trolley lado a lado, dos cabeceras compartiendo una fila. */
+  .especificaciones-dobles { display: flex; gap: 0; }
+  .especificaciones-dobles > div { flex: 1; }
+  .especificaciones-dobles table { margin-top: 0; }
+  .especificaciones-dobles .cabecera-bloque { font-size: 9.5pt; }
+
+  /* --- Mediciones --- */
+  table.mediciones th, table.mediciones td {
+    border: 0.75pt solid #999; padding: .15cm .25cm; text-align: center; font-size: 9pt;
+  }
+
+  /* --- Anexo 4 --- */
+  table.anexo th, table.anexo td {
+    border: 0.75pt solid #999; padding: .12cm .25cm; font-size: 8.5pt;
+  }
+  table.anexo th { background: #eef3f7; }
+
+  /* Colores exactos del documento real (confirmados en el .docx: srgbClr/w:fill), no
+     aproximados: verde claro = Bueno, amarillo puro = Regular, rojo puro = Malo. Mismo
+     criterio en la leyenda, la celda de estado del Anexo 4 y el cintillo de las fotos. */
+  .estado-B { background: #92D050; color: #1a1a1a; font-weight: bold; }
+  .estado-R { background: #FFFF00; color: #1a1a1a; font-weight: bold; }
+  .estado-M { background: #FF0000; color: #fff; font-weight: bold; }
+  .estado-NA { background: #e0e0e0; color: #555; }
+</style>
+</head>
+<body>
+
+<!-- ===================== PORTADA ===================== -->
+<div class="portada">
+  <div>
+    <div class="encabezado-portada">
+      <img src="{{ logo_damol_data_uri }}" style="height:1.6cm;" alt="Damol">
+      <div class="marca">DAMOL INGENIEROS SAC</div>
+    </div>
+
+    <div class="franja">
+      <div class="titulo-tipo">INFORME TÉCNICO — {{ servicio.get_tipo_servicio_display|upper }}</div>
+      <h1 class="titulo-informe">{{ servicio.titulo|default:"Mantenimiento de equipo de izaje" }}</h1>
+
+      <table class="datos-portada">
+        <tr><td>N.º de informe:</td><td>{{ servicio.codigo }}</td></tr>
+        <tr><td>Orden de compra:</td><td>{{ servicio.orden_compra|default:"---" }}</td></tr>
+        <tr><td>Cliente:</td><td>{{ servicio.cliente.razon_social }}</td></tr>
+        <tr><td>Equipo:</td><td>{{ equipo }}</td></tr>
+        <tr><td>Ejecución de trabajo:</td>
+            <td>{{ servicio.fecha_ejecucion_inicio|date:"d/m/Y"|default:"---" }}
+                — {{ servicio.fecha_ejecucion_fin|date:"d/m/Y"|default:"---" }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="elaborado-por">
+    {% if servicio.elaborado_por %}
+      <div class="titulo-bloque">Elaborado por</div>
+      <div class="nombre-elaborador">{{ servicio.elaborado_por }}</div>
+    {% endif %}
+
+    <div class="fila-logos">
+      <img src="{{ logo_damol_data_uri }}" alt="Damol">
+      {% if logo_cliente_ruta %}<img src="{{ logo_cliente_ruta }}" alt="{{ servicio.cliente }}">{% endif %}
+    </div>
+    <div class="pie-portada">DAMOL INGENIEROS SAC · www.damol.com.pe</div>
+  </div>
+</div>
+
+<!-- ===================== ÍNDICE ===================== -->
+<div class="seccion">
+  <h1>Contenido</h1>
+  <a class="toc-entry" href="#sec-datos-equipo">
+    <span class="toc-label">Datos principales del equipo</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry" href="#sec-objetivo">
+    <span class="toc-label">1. Objetivo</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry" href="#sec-antecedentes">
+    <span class="toc-label">2. Antecedentes</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry" href="#sec-normatividad">
+    <span class="toc-label">3. Normatividad</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry" href="#sec-descripcion">
+    <span class="toc-label">4. Descripción del servicio</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry nivel2" href="#sec-personal">
+    <span class="toc-label">4.1. Personal ejecutor</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry nivel2" href="#sec-materiales">
+    <span class="toc-label">4.2. Materiales y herramientas</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry nivel2" href="#sec-trabajos-previos">
+    <span class="toc-label">4.3. Trabajos previos</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry nivel2" href="#sec-trabajos-operativos">
+    <span class="toc-label">4.4. Trabajos operativos</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry nivel2" href="#sec-hallazgos">
+    <span class="toc-label">4.5. Hallazgos importantes</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry" href="#sec-mediciones">
+    <span class="toc-label">5. Medición de parámetros eléctricos</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry" href="#sec-observaciones">
+    <span class="toc-label">6. Observaciones</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry" href="#sec-recomendaciones">
+    <span class="toc-label">7. Recomendaciones</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry" href="#sec-conclusiones">
+    <span class="toc-label">8. Conclusiones</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry" href="#sec-anexo1">
+    <span class="toc-label">9. Anexo 1: Calificación de los técnicos</span>
+    <span class="toc-relleno"></span>
+  </a>
+  <a class="toc-entry" href="#sec-anexo2">
+    <span class="toc-label">10. Anexo 2: Calibración de equipos de medición</span>
+    <span class="toc-relleno"></span>
+  </a>
+  {% if anexo_checklist %}
+  <a class="toc-entry" href="#sec-anexo4">
+    <span class="toc-label">11. Anexo 4: Checklist de mantenimiento</span>
+    <span class="toc-relleno"></span>
+  </a>
+  {% endif %}
+</div>
+
+<!-- ===================== DATOS DEL EQUIPO ===================== -->
+<div class="seccion" id="sec-datos-equipo">
+  <h2>Datos principales del equipo</h2>
+
+  <div class="bloque-datos">
+    <div class="cabecera-bloque">Datos técnicos</div>
+    <div class="bloque-datos-con-foto">
+      <div class="columna-tabla">
+        <table class="datos">
+          <tr><th>Equipo</th><td>{{ equipo.tipo_equipo }}</td></tr>
+          <tr><th>Código interno</th><td>{{ equipo.codigo_interno|default:"---" }}</td></tr>
+          <tr><th>Marca de estructura</th><td>{{ equipo.marca_estructura|default:"---" }}</td></tr>
+          <tr><th>Marca de polipasto</th><td>{{ equipo.marca_polipasto|default:"---" }}</td></tr>
+          <tr><th>Capacidad</th><td>{{ equipo.capacidad_ton|default:"---" }} t</td></tr>
+          <tr><th>N.° de serie</th><td>{{ equipo.numero_serie|default:"---" }}</td></tr>
+          <tr><th>Modelo</th><td>{{ equipo.modelo|default:"---" }}</td></tr>
+          <tr><th>Fecha de fabricación</th><td>{{ equipo.fecha_fabricacion|date:"d/m/Y"|default:"---" }}</td></tr>
+        </table>
+      </div>
+      <div class="columna-foto">
+        {% if equipo_foto_ruta %}
+          <img src="{{ equipo_foto_ruta }}" alt="Foto del equipo">
+        {% else %}
+          <div class="foto-vacia">Sin foto cargada</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if ficha.especificaciones_polipasto or ficha.especificaciones_trolley %}
+  <div class="bloque-datos">
+    <div class="especificaciones-dobles">
+      <div>
+        <div class="cabecera-bloque">Especificaciones del polipasto</div>
+        <table class="simple">
+          {% for clave, valor in ficha.especificaciones_polipasto.items %}
+          <tr><td>{{ clave }}</td><td>{{ valor }}</td></tr>
+          {% empty %}
+          <tr><td colspan="2">---</td></tr>
+          {% endfor %}
+        </table>
+      </div>
+      <div>
+        <div class="cabecera-bloque">Especificaciones del trolley</div>
+        <table class="simple">
+          {% for clave, valor in ficha.especificaciones_trolley.items %}
+          <tr><td>{{ clave }}</td><td>{{ valor }}</td></tr>
+          {% empty %}
+          <tr><td colspan="2">---</td></tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="bloque-datos">
+    <div class="cabecera-bloque">Ubicación del equipo</div>
+    <div class="bloque-datos-con-foto">
+      <div class="columna-tabla">
+        <table class="datos">
+          <tr><th>Ubicación</th><td>{{ equipo.ubicacion|default:"---" }}</td></tr>
+        </table>
+      </div>
+      <div class="columna-foto">
+        {% if equipo_foto_ubicacion_ruta %}
+          <img src="{{ equipo_foto_ubicacion_ruta }}" alt="Foto de la ubicación">
+        {% else %}
+          <div class="foto-vacia">Sin foto cargada</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== OBJETIVO / ANTECEDENTES / NORMATIVIDAD ===================== -->
+<div class="seccion" id="sec-objetivo">
+  <h2>1. Objetivo</h2>
+  <p>{{ objetivo_texto|linebreaks }}</p>
+</div>
+
+<div id="sec-antecedentes">
+  <h2>2. Antecedentes</h2>
+  <p>{{ antecedentes_texto|linebreaks }}</p>
+</div>
+
+<div id="sec-normatividad">
+  <h2>3. Normatividad</h2>
+  <p style="white-space: pre-line;">{{ configuracion.normatividad_texto|default:"---" }}</p>
+</div>
+
+<!-- ===================== DESCRIPCIÓN DEL SERVICIO ===================== -->
+<div class="seccion" id="sec-descripcion">
+  <h2>4. Descripción del servicio</h2>
+
+  <div id="sec-personal">
+    <h3>4.1. Personal ejecutor</h3>
+    <table class="simple">
+      <tr><th>Técnico</th><th>Rol</th></tr>
+      {% for p in personal_ejecutor %}
+      <tr><td>{{ p.tecnico }}</td><td>{{ p.rol }}</td></tr>
+      {% empty %}
+      <tr><td colspan="2">Sin personal registrado.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div id="sec-materiales">
+    <h3>4.2. Materiales y herramientas</h3>
+    <table class="simple">
+      <tr><th>Ítem</th><th>Descripción</th><th>Marca</th><th>Cant.</th><th>Unidad</th></tr>
+      {% for m in materiales %}
+      <tr><td>{{ m.item }}</td><td>{{ m.descripcion }}</td><td>{{ m.marca }}</td><td>{{ m.cantidad }}</td><td>{{ m.unidad }}</td></tr>
+      {% empty %}
+      <tr><td colspan="5">Sin materiales registrados.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div id="sec-trabajos-previos">
+    <h3>4.3. Trabajos previos</h3>
+    <p>{{ ficha.trabajos_previos|default:"---"|linebreaks }}</p>
+  </div>
+
+  <div id="sec-trabajos-operativos">
+    <h3>4.4. Trabajos operativos</h3>
+
+    <p><strong>La evaluación de los componentes se da según su nivel de alerta:</strong></p>
+    <div class="leyenda-alertas">
+      <div class="fila-alerta">
+        <div class="etiqueta-alerta estado-M">Alerta roja</div>
+        <div class="texto-alerta">Se recomienda cambio inmediato o en corto plazo.</div>
+      </div>
+      <div class="fila-alerta">
+        <div class="etiqueta-alerta estado-R">Alerta amarilla</div>
+        <div class="texto-alerta">El equipo puede trabajar con dicha observación, sin embargo, se recomienda su cambio.</div>
+      </div>
+      <div class="fila-alerta">
+        <div class="etiqueta-alerta estado-B">Alerta verde</div>
+        <div class="texto-alerta">Equipo o componentes en buen estado.</div>
+      </div>
+    </div>
+
+    {% if not checklist_existe %}
+      <p>Este servicio no tiene checklist estándar asociado — ver "4.5. Hallazgos importantes" para el detalle de lo encontrado y resuelto.</p>
+    {% elif not trabajos_operativos %}
+      <p>No se registraron hallazgos con foto o comentario en el checklist de este servicio.</p>
+    {% endif %}
+    {% for grupo in trabajos_operativos %}
+      <h3>{{ grupo.sistema.nombre }}</h3>
+      {% for hallazgo in grupo.hallazgos %}
+        <div class="hallazgo">
+          <p>➢ {{ hallazgo.parrafo }}</p>
+          {% if hallazgo.fotos %}
+          <div class="fotos-hallazgo">
+            {% for f in hallazgo.fotos %}
+            <figure>
+              <img src="file://{{ f.foto.imagen.path }}" alt="">
+              <figcaption class="estado-{{ hallazgo.respuesta.estado|default:'NA' }}">Imagen N°{{ f.numero|stringformat:"02d" }}. {{ f.foto.descripcion }}</figcaption>
+            </figure>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+
+  <div id="sec-hallazgos">
+    <h3>4.5. Hallazgos importantes</h3>
+    <p>
+      {% if checklist_existe %}
+        Hallazgos encontrados fuera del checklist estándar.
+      {% else %}
+        Contenido principal de este servicio: qué se encontró y qué se hizo.
+      {% endif %}
+    </p>
+    {% if not hallazgos %}
+      <p>Sin hallazgos importantes registrados.</p>
+    {% endif %}
+    {% for hallazgo in hallazgos %}
+      <div class="hallazgo">
+        <p>➢ {% if hallazgo.sistema %}<strong>{{ hallazgo.sistema.nombre }}:</strong> {% endif %}{{ hallazgo.descripcion }}</p>
+        {% if hallazgo.fotos.all %}
+        <div class="fotos-hallazgo">
+          {% for foto in hallazgo.fotos.all %}
+          <figure>
+            <img src="file://{{ foto.imagen.path }}" alt="">
+            <figcaption>{{ foto.descripcion }}</figcaption>
+          </figure>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ===================== MEDICIONES ===================== -->
+<div class="seccion" id="sec-mediciones">
+  <h2>5. Medición de parámetros eléctricos</h2>
+  {% if not grupos_medicion %}
+    <p>No se registraron mediciones para este servicio.</p>
+  {% endif %}
+  {% for data in grupos_medicion %}
+    <h3>{{ data.grupo.nombre }}{% if data.grupo.unidad %} ({{ data.grupo.unidad }}){% endif %}</h3>
+    <table class="mediciones">
+      <tr>
+        <th></th>
+        {% for columna in data.columnas %}<th>{{ columna.etiqueta }}</th>{% endfor %}
+      </tr>
+      {% for fila, celdas in data.filas %}
+      <tr>
+        <th>{{ fila.etiqueta }}</th>
+        {% for valor in celdas %}<td>{{ valor.valor|default:"---" }}</td>{% endfor %}
+      </tr>
+      {% endfor %}
+    </table>
+  {% endfor %}
+</div>
+
+<!-- ===================== OBSERVACIONES / RECOMENDACIONES / CONCLUSIONES ===================== -->
+<div class="seccion" id="sec-observaciones">
+  <h2>6. Observaciones</h2>
+  <ul class="lista-vinetas">
+    {% for o in observaciones %}<li>{{ o.texto }}</li>{% empty %}<li>Sin observaciones.</li>{% endfor %}
+  </ul>
+</div>
+
+<div id="sec-recomendaciones">
+  <h2>7. Recomendaciones</h2>
+  <ul class="lista-vinetas">
+    {% for r in recomendaciones %}<li>{{ r.texto }}</li>{% empty %}<li>Sin recomendaciones.</li>{% endfor %}
+  </ul>
+</div>
+
+<div id="sec-conclusiones">
+  <h2>8. Conclusiones</h2>
+  <ul class="lista-vinetas">
+    {% for c in conclusiones %}<li>{{ c.texto }}</li>{% empty %}<li>Sin conclusiones.</li>{% endfor %}
+  </ul>
+</div>
+
+<!-- ===================== ANEXOS ===================== -->
+<div class="seccion" id="sec-anexo1">
+  <h2>9. Anexo 1: Calificación de los técnicos</h2>
+  <p>Ver certificaciones adjuntas.</p>
+</div>
+
+<div id="sec-anexo2">
+  <h2>10. Anexo 2: Calibración de equipos de medición</h2>
+  <p>Ver certificaciones adjuntas.</p>
+</div>
+
+{% if anexo_checklist %}
+<div class="seccion" id="sec-anexo4">
+  <h2>11. Anexo 4: Checklist de mantenimiento</h2>
+  {% for grupo in anexo_checklist %}
+    <h3>{{ grupo.sistema.nombre }}</h3>
+    <table class="anexo">
+      <tr><th>Código</th><th>Descripción</th><th>Variante</th><th>Estado</th></tr>
+      {% for r in grupo.filas %}
+      <tr>
+        <td>{{ r.item.codigo }}</td>
+        <td>{{ r.item.descripcion }}</td>
+        <td>{{ r.variante|default:"---" }}</td>
+        <td class="estado-{{ r.estado|default:'NA' }}">{{ r.get_estado_display|default:"---" }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% endfor %}
+</div>
+{% endif %}
+
+</body>
+</html>

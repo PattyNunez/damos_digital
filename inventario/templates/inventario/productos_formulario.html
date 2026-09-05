@@ -1,0 +1,47 @@
+{% extends "base_shell.html" %}
+
+{% block title %}{% if producto %}Editar producto{% else %}Nuevo producto{% endif %}{% endblock %}
+
+{% block encabezado %}{% if producto %}Editar producto{% else %}Nuevo producto{% endif %}{% endblock %}
+
+{% block content %}
+<p><a class="enlace-volver" href="{% url 'inventario:productos' %}">&larr; Volver a productos</a></p>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="tarjeta-seccion">
+    <h2>Datos del producto</h2>
+
+    <label for="{{ form.codigo.id_for_label }}">Código</label>
+    {{ form.codigo }}
+    {{ form.codigo.errors }}
+
+    <label for="{{ form.nombre.id_for_label }}">Nombre</label>
+    {{ form.nombre }}
+    {{ form.nombre.errors }}
+
+    <label for="{{ form.descripcion.id_for_label }}">Descripción</label>
+    {{ form.descripcion }}
+
+    <label for="{{ form.categoria.id_for_label }}">Categoría</label>
+    {{ form.categoria }}
+
+    <label for="{{ form.unidad_medida.id_for_label }}">Unidad de medida</label>
+    {{ form.unidad_medida }}
+
+    <label for="{{ form.precio_referencial.id_for_label }}">Precio referencial</label>
+    {{ form.precio_referencial }}
+    {{ form.precio_referencial.errors }}
+
+    <label for="{{ form.moneda.id_for_label }}">Moneda</label>
+    {{ form.moneda }}
+
+    <label for="{{ form.proveedor_principal.id_for_label }}">Proveedor principal</label>
+    {{ form.proveedor_principal }}
+
+    <label for="{{ form.activo.id_for_label }}">{{ form.activo }} Producto activo</label>
+  </div>
+
+  <button type="submit">Guardar producto</button>
+</form>
+{% endblock %}

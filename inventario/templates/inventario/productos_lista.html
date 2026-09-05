@@ -1,0 +1,44 @@
+{% extends "base_shell.html" %}
+
+{% block title %}Catálogo de productos{% endblock %}
+
+{% block encabezado %}Catálogo de productos{% endblock %}
+
+{% block content %}
+<p class="subnav">
+  <strong>Productos</strong> · <a class="enlace-accion" href="{% url 'inventario:proveedores' %}">Proveedores</a>
+</p>
+
+<div class="tarjeta-seccion">
+  <div class="barra-acciones">
+    <form method="get" class="buscador">
+      <input type="text" name="q" value="{{ q }}" placeholder="Buscar por código, nombre o categoría...">
+      <button type="submit">Buscar</button>
+    </form>
+    <div>
+      <a href="{% url 'inventario:importar' %}"><button type="button" class="secundario">Importar desde Excel</button></a>
+      <a href="{% url 'inventario:producto_nuevo' %}"><button type="button">+ Nuevo producto</button></a>
+    </div>
+  </div>
+
+  <table class="mediciones">
+    <tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Proveedor</th><th>Estado</th><th></th></tr>
+    {% for p in productos %}
+    <tr>
+      <td>{{ p.codigo }}</td>
+      <td>{{ p.nombre }}</td>
+      <td>{{ p.categoria|default:"—" }}</td>
+      <td>{{ p.precio_referencial }} {{ p.moneda }}</td>
+      <td>{{ p.proveedor_principal.razon_social|default:"—" }}</td>
+      <td>{% if p.activo %}Activo{% else %}<span class="ayuda">Inactivo</span>{% endif %}</td>
+      <td class="acciones">
+        <a class="enlace-accion" href="{% url 'inventario:producto_editar' p.pk %}">Editar</a>
+        · <a class="enlace-accion peligro" href="{% url 'inventario:producto_eliminar' p.pk %}">Eliminar</a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7">Sin productos registrados{% if q %} para "{{ q }}"{% endif %}.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

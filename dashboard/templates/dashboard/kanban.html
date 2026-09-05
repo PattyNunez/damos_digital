@@ -1,0 +1,37 @@
+{% extends "base_shell.html" %}
+
+{% block title %}Panel de seguimiento{% endblock %}
+
+{% block encabezado %}Panel de seguimiento{% endblock %}
+
+{% block content %}
+<div class="barra-acciones">
+  <a class="enlace-volver" href="{% url 'dashboard:inicio' %}">← Ver dashboard de indicadores</a>
+  <a href="{% url 'dashboard:exportar_excel' %}"><button type="button" class="secundario">Exportar a Excel</button></a>
+</div>
+
+<div class="kanban">
+  {% for columna in columnas %}
+  <div class="columna-kanban columna-{{ columna.clave }}">
+    <div class="cabecera-columna">
+      <span>{{ columna.estado }}</span>
+      <span class="contador-columna">{{ columna.servicios|length }}</span>
+    </div>
+    <div class="cuerpo-columna">
+      {% for s in columna.servicios %}
+      <a class="tarjeta-kanban" href="{% url 'dashboard:detalle_servicio' s.pk %}">
+        {% if s.dias_en_alerta is not None %}
+        <span class="badge-alerta" title="Lleva {{ s.dias_en_alerta }} días en este estado">⚠ {{ s.dias_en_alerta }} días</span>
+        {% endif %}
+        <strong>{{ s.codigo }}</strong>
+        {{ s.cliente }}
+        <div class="monto-tarjeta">{{ s.monto_total }} {{ s.moneda }}</div>
+      </a>
+      {% empty %}
+      <p class="sin-tarjetas">Sin servicios.</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

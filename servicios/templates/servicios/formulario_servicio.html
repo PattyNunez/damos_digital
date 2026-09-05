@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+
+{% block title %}{{ servicio.codigo }} · Checklist de campo{% endblock %}
+
+{% block extra_style %}
+<style>
+  /* --- CTA principal al entrar al servicio: llenar checklist/hallazgos, no "una pestaña más". --- */
+  .cta-principal { display:block; text-decoration:none; margin-bottom:.6rem; }
+  .cta-principal button { width:100%; font-size:1.05rem; padding:.9rem 1.25rem; }
+
+  /* --- Checklist reestructurado: categoría (Mecánico/Eléctrico/Generales) > sistema > ítem,
+     mismo agrupamiento del checklist físico MNT-F-001. --- */
+  .categoria-checklist {
+    margin:1.6rem 0 .5rem; padding:.55rem .8rem; border-radius:6px; font-size:1.05rem;
+    border-left:5px solid #445; background:#eef1f5; color:#223;
+  }
+  .categoria-checklist:first-of-type { margin-top:.4rem; }
+  .categoria-checklist.cat-mecanico { border-left-color:#3b5bdb; background:#eef1fb; color:#1c2a63; }
+  .categoria-checklist.cat-electrico { border-left-color:#f08c00; background:#fff4e6; color:#7a4a00; }
+  .categoria-checklist.cat-generales { border-left-color:#868e96; background:#f1f3f5; color:#495057; }
+  .sistema-checklist-titulo {
+    display:flex; align-items:center; gap:.4rem; width:100%; margin:1rem 0 .3rem;
+    font-size:1rem; font-weight:700; color:#444; background:none; border:none; padding:.4rem 0;
+    text-align:left; cursor:pointer; font-family:inherit;
+  }
+  .flecha-sistema { display:inline-block; transition:transform .15s ease; font-size:.8rem; }
+  .sistema-checklist.colapsado .flecha-sistema { transform:rotate(-90deg); }
+  .sistema-checklist.colapsado .sistema-checklist-cuerpo { display:none; }
+
+  .fila-item-checklist { display:grid; grid-template-columns:1fr; gap:.5rem; padding:1rem 0; border-bottom:1px solid #eee; }
+  .fila-item-checklist .codigo { color:#777; font-size:.85rem; }
+  @media (min-width:620px) {
+    .fila-item-checklist { grid-template-columns:2fr 1.3fr 2fr; align-items:start; gap:1rem; }
+    .fila-item-checklist .col-observacion label { margin-top:0; }
+  }
+
+  .chips-estado { display:flex; flex-wrap:wrap; gap:.4rem; }
+  .chip-estado {
+    display:flex; align-items:center; justify-content:center; min-width:2.7rem; height:2.7rem; padding:0 .5rem;
+    border-radius:10px; border:2px solid #ccc; background:#fff; font-weight:700; font-size:.9rem;
+    color:#666; cursor:pointer; user-select:none;
+  }
+  .chip-estado input { display:none; } /* :has(input:checked) sigue funcionando aunque el input esté oculto */
+  .chip-estado.chip-b { border-color:#2e7d32; color:#2e7d32; }
+  .chip-estado.chip-r { border-color:#b5890a; color:#8a6a08; }
+  .chip-estado.chip-m { border-color:#c62828; color:#c62828; }
+  .chip-estado.chip-na { border-color:#9aa0a6; color:#666; }
+  .chip-estado:has(input:checked) { color:#fff; }
+  .chip-estado.chip-b:has(input:checked) { background:#2e7d32; }
+  .chip-estado.chip-r:has(input:checked) { background:#e0a806; border-color:#e0a806; color:#1a1a1a; }
+  .chip-estado.chip-m:has(input:checked) { background:#c62828; }
+  .chip-estado.chip-na:has(input:checked) { background:#9aa0a6; }
+
+  /* --- CTA principal: mismo naranja/ámbar que el resto de la app (dashboard, kanban, chips). --- */
+  .cta-principal button { background:#FF9900; color:#1a1a1a; }
+
+  /* --- Campos cortos en fila (Datos generales: fecha/hora) --- */
+  .fila-3col { display:grid; grid-template-columns:1fr; gap:0 .75rem; }
+  @media (min-width:480px) { .fila-3col { grid-template-columns:repeat(3, 1fr); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>{{ servicio.codigo }}</h1>
+<p>{{ servicio.cliente }} — {{ servicio.equipo }}</p>
+
+{% if servicio.tipo_servicio == "preventivo" %}
+  <a href="#checklist" class="cta-principal" data-destino="checklist"><button type="button">📋 Llenar checklist de visita</button></a>
+{% else %}
+  <a href="#hallazgos" class="cta-principal" data-destino="hallazgos"><button type="button">📋 Registrar hallazgos de la visita</button></a>
+{% endif %}
+
+{% if servicio.informe_disponible %}
+<form method="post" action="{% url 'reportes:generar_informe' servicio.pk %}">
+  {% csrf_token %}
+  <button type="submit" class="secundario">Generar informe PDF</button>
+</form>
+{% else %}
+<p class="ayuda" id="mensaje-informe-no-disponible">{{ servicio.mensaje_informe_no_disponible }}</p>
+{% endif %}
+
+<nav class="secciones">
+  <a href="#generales">Datos generales</a>
+  <a href="#personal">Personal</a>
+  <a href="#materiales">Materiales</a>
+  <a href="#checklist">Checklist</a>
+  <a href="#hallazgos">Hallazgos</a>
+  <a href="#mediciones">Mediciones</a>
+  <a href="#observaciones">Observ./Recom./Concl.</a>
+</nav>
+
+<section id="generales">
+  <h2>1. Datos generales del servicio</h2>
+  <form method="post" action="{% url 'servicios:guardar_ficha' servicio.pk %}">
+    {% csrf_token %}
+    <div class="fila-3col">
+      <div>
+        <label for="{{ ficha_form.fecha_servicio.id_for_label }}">Fecha de servicio</label>
+        {{ ficha_form.fecha_servicio }}
+      </div>
+      <div>
+        <label for="{{ ficha_form.hora_entrada.id_for_label }}">Hora de entrada</label>
+        {{ ficha_form.hora_entrada }}
+      </div>
+      <div>
+        <label for="{{ ficha_form.hora_salida.id_for_label }}">Hora de salida</label>
+        {{ ficha_form.hora_salida }}
+      </div>
+    </div>
+    <label for="{{ ficha_form.condiciones_ambientales.id_for_label }}">Condiciones ambientales</label>
+    {{ ficha_form.condiciones_ambientales }}
+    <label for="{{ ficha_form.objetivo.id_for_label }}">Objetivo</label>
+    {{ ficha_form.objetivo }}
+    <label for="{{ ficha_form.antecedentes.id_for_label }}">Antecedentes</label>
+    {{ ficha_form.antecedentes }}
+    <label for="{{ ficha_form.trabajos_previos.id_for_label }}">Trabajos previos</label>
+    {{ ficha_form.trabajos_previos }}
+    {{ ficha_form.non_field_errors }}
+    <button type="submit">Guardar datos generales</button>
+  </form>
+</section>
+
+<section id="personal">
+  <h2>2. Personal ejecutor</h2>
+  <form method="post" enctype="multipart/form-data" action="{% url 'servicios:guardar_personal' servicio.pk %}">
+    {% csrf_token %}
+    {{ personal_formset.management_form }}
+    {{ personal_formset.non_form_errors }}
+    {% for form in personal_formset %}
+      <div class="fila-formset">
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        <label>Técnico</label>
+        {{ form.tecnico }}
+        <label>Rol en este servicio</label>
+        {{ form.rol }}
+        <label>Firma (foto/escaneo, opcional)</label>
+        {{ form.firma }}
+        {% if form.instance.pk %}
+          <label><input type="checkbox" name="{{ form.prefix }}-DELETE" style="width:auto;display:inline-block;"> Eliminar esta fila</label>
+        {% endif %}
+        {{ form.non_field_errors }}
+      </div>
+    {% endfor %}
+    <button type="submit">Guardar personal ejecutor</button>
+  </form>
+</section>
+
+<section id="materiales">
+  <h2>3. Materiales y herramientas usadas</h2>
+  <form method="post" action="{% url 'servicios:guardar_materiales' servicio.pk %}">
+    {% csrf_token %}
+    {{ materiales_formset.management_form }}
+    {{ materiales_formset.non_form_errors }}
+    {% for form in materiales_formset %}
+      <div class="fila-formset">
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        <label>Ítem N°</label>
+        {{ form.item }}
+        <label>Descripción</label>
+        {{ form.descripcion }}
+        <label>Marca</label>
+        {{ form.marca }}
+        <label>Cantidad</label>
+        {{ form.cantidad }}
+        <label>Unidad</label>
+        {{ form.unidad }}
+        {% if form.instance.pk %}
+          <label><input type="checkbox" name="{{ form.prefix }}-DELETE" style="width:auto;display:inline-block;"> Eliminar esta fila</label>
+        {% endif %}
+      </div>
+    {% endfor %}
+    <button type="submit">Guardar materiales y herramientas</button>
+  </form>
+</section>
+
+<section id="checklist">
+  <h2>4. Checklist por sistema</h2>
+  {% if not checklist_por_categoria %}
+    {% if servicio.tipo_servicio == "correctivo" %}
+      <p class="ayuda">Los correctivos no usan el checklist completo — registra lo encontrado y resuelto en la sección "5. Hallazgos importantes".</p>
+    {% else %}
+      <p class="ayuda">Este servicio todavía no tiene ítems de checklist. Se generan automáticamente según el tipo de equipo si existe una plantilla (SistemaChecklist/ItemChecklistPlantilla) definida en el admin.</p>
+    {% endif %}
+  {% endif %}
+  <form method="post" action="{% url 'servicios:guardar_checklist' servicio.pk %}">
+    {% csrf_token %}
+    {{ checklist_formset.management_form }}
+    {{ checklist_formset.non_form_errors }}
+    {% for categoria_label, sistemas in checklist_por_categoria %}
+      <h3 class="categoria-checklist cat-{{ categoria_label|slugify }}">{{ categoria_label }}</h3>
+      {% for sistema, pares, tiene_respuestas in sistemas %}
+        <div class="sistema-checklist{% if not tiene_respuestas %} colapsado{% endif %}">
+          <button type="button" class="sistema-checklist-titulo" data-toggle-sistema>
+            <span class="flecha-sistema">▾</span> {{ sistema.nombre }}
+          </button>
+          <div class="sistema-checklist-cuerpo">
+            {% for form, respuesta in pares %}
+              <div class="fila-item-checklist">
+                {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                <div class="col-item">
+                  <div class="codigo">{{ respuesta.item.codigo }}{% if respuesta.variante %} · {{ respuesta.variante }}{% endif %}</div>
+                  <strong>{{ respuesta.item.descripcion }}</strong>
+                </div>
+                <div class="col-condicion">
+                  <div class="chips-estado">
+                    {% for valor, simbolo, titulo in opciones_estado_chip %}
+                    <label class="chip-estado chip-{{ valor|lower }}" title="{{ titulo }}">
+                      <input type="radio" name="{{ form.estado.html_name }}" value="{{ valor }}" {% if form.estado.value == valor %}checked{% endif %}>
+                      <span>{{ simbolo }}</span>
+                    </label>
+                    {% endfor %}
+                  </div>
+                </div>
+                <div class="col-observacion">
+                  <label>Observación</label>
+                  {{ form.observacion }}
+                </div>
+
+                <div class="foto-lista">
+                  {% for foto in respuesta.fotos.all %}
+                    <figure>
+                      <img src="{{ foto.imagen.url }}" alt="{{ foto.descripcion }}">
+                      <figcaption>{{ foto.descripcion }}</figcaption>
+                      <!-- El <form> real vive fuera (ver más abajo) — HTML no soporta <form>
+                           anidado, y este botón ya está dentro del <form> grande del checklist.
+                           El atributo form="..." lo asocia sin anidarlo. -->
+                      <button type="submit" form="foto-eliminar-{{ foto.pk }}" class="peligro">Eliminar foto</button>
+                    </figure>
+                  {% endfor %}
+                </div>
+                <details class="subir-foto">
+                  <summary>Agregar foto</summary>
+                  <label>Foto (cámara o galería)</label>
+                  <input type="file" name="imagen" accept="image/*" capture="environment" form="foto-agregar-{{ respuesta.pk }}">
+                  <label>Descripción corta</label>
+                  <input type="text" name="descripcion" form="foto-agregar-{{ respuesta.pk }}">
+                  <button type="submit" form="foto-agregar-{{ respuesta.pk }}">Subir foto</button>
+                </details>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    {% endfor %}
+    {% if checklist_por_categoria %}
+      <button type="submit">Guardar checklist</button>
+    {% endif %}
+  </form>
+
+  <!-- Mini-forms de fotos, FUERA del <form> principal a propósito (ver comentario de arriba
+       — este es el mismo problema de <form> anidado que Hallazgos ya evitaba; acá lo
+       corregimos de raíz con el atributo form="..." en vez de solo evitarlo en lo nuevo). -->
+  {% for categoria_label, sistemas in checklist_por_categoria %}
+    {% for sistema, pares, tiene_respuestas in sistemas %}
+      {% for form, respuesta in pares %}
+        <form id="foto-agregar-{{ respuesta.pk }}" method="post" enctype="multipart/form-data"
+              action="{% url 'servicios:agregar_foto_checklist' servicio.pk respuesta.pk %}" hidden>
+          {% csrf_token %}
+        </form>
+        {% for foto in respuesta.fotos.all %}
+          <form id="foto-eliminar-{{ foto.pk }}" method="post"
+                action="{% url 'servicios:eliminar_foto_checklist' servicio.pk foto.pk %}" hidden>
+            {% csrf_token %}
+          </form>
+        {% endfor %}
+      {% endfor %}
+    {% endfor %}
+  {% endfor %}
+</section>
+
+<section id="hallazgos">
+  <h2>5. Hallazgos importantes</h2>
+  <p class="ayuda">
+    Regístra acá cualquier cosa que no esté contemplada en el checklist estándar (o, si este
+    servicio no tiene checklist completo — como un correctivo — el contenido principal del
+    informe: qué se encontró y qué se hizo, con fotos).
+  </p>
+  <form method="post" action="{% url 'servicios:guardar_hallazgos' servicio.pk %}">
+    {% csrf_token %}
+    {{ hallazgos_formset.management_form }}
+    {{ hallazgos_formset.non_form_errors }}
+    {% for form in hallazgos_formset %}
+      <div class="fila-formset">
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        <label>Sistema (opcional)</label>
+        {{ form.sistema }}
+        <label>Descripción</label>
+        {{ form.descripcion }}
+        {% if form.instance.pk %}
+          <label><input type="checkbox" name="{{ form.prefix }}-DELETE" style="width:auto;display:inline-block;"> Eliminar este hallazgo</label>
+        {% endif %}
+        {{ form.non_field_errors }}
+      </div>
+    {% endfor %}
+    <button type="submit">Guardar hallazgos</button>
+  </form>
+
+  {% comment %}
+  Las fotos se manejan en formularios aparte (no anidados dentro del <form> de arriba: HTML no
+  soporta <form> dentro de <form>, y el checklist ya tiene ese problema latente — acá lo evito).
+  {% endcomment %}
+  {% for form in hallazgos_formset %}
+    {% if form.instance.pk %}
+      <div class="fila-formset">
+        <strong>Fotos de "{{ form.instance.descripcion|truncatechars:40 }}"</strong>
+        <div class="foto-lista">
+          {% for foto in form.instance.fotos.all %}
+            <figure>
+              <img src="{{ foto.imagen.url }}" alt="{{ foto.descripcion }}">
+              <figcaption>{{ foto.descripcion }}</figcaption>
+              <form method="post" action="{% url 'servicios:eliminar_foto_hallazgo' servicio.pk foto.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="peligro">Eliminar foto</button>
+              </form>
+            </figure>
+          {% endfor %}
+        </div>
+        <details class="subir-foto">
+          <summary>Agregar foto</summary>
+          <form method="post" enctype="multipart/form-data" action="{% url 'servicios:agregar_foto_hallazgo' servicio.pk form.instance.pk %}">
+            {% csrf_token %}
+            <label>Foto (cámara o galería)</label>
+            {{ foto_hallazgo_form.imagen }}
+            <label>Descripción corta</label>
+            {{ foto_hallazgo_form.descripcion }}
+            <button type="submit">Subir foto</button>
+          </form>
+        </details>
+      </div>
+    {% endif %}
+  {% endfor %}
+</section>
+
+<section id="mediciones">
+  <h2>6. Mediciones técnicas</h2>
+
+  {% for data in grupos_medicion_data %}
+    <div class="grupo-medicion">
+      <h3>{{ data.grupo.nombre }}{% if data.grupo.unidad %} ({{ data.grupo.unidad }}){% endif %}</h3>
+      <form method="post" action="{% url 'servicios:guardar_grupo_medicion' servicio.pk data.grupo.pk %}">
+        {% csrf_token %}
+        <table class="mediciones">
+          <thead>
+            <tr>
+              <th></th>
+              {% for columna in data.columnas %}<th>{{ columna.etiqueta }}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for fila, celdas in data.filas %}
+            <tr>
+              <th>{{ fila.etiqueta }}</th>
+              {% for valor in celdas %}
+                <td>
+                  {% if valor %}
+                    <input type="text" name="valor_{{ valor.pk }}" value="{{ valor.valor }}">
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="submit">Guardar "{{ data.grupo.nombre }}"</button>
+      </form>
+      <form method="post" action="{% url 'servicios:eliminar_grupo_medicion' servicio.pk data.grupo.pk %}" onsubmit="return confirm('¿Eliminar esta tabla de mediciones?');">
+        {% csrf_token %}
+        <button type="submit" class="peligro">Eliminar tabla</button>
+      </form>
+    </div>
+  {% endfor %}
+
+  <div class="grupo-medicion">
+    <h3>Agregar nueva tabla de mediciones</h3>
+    <form method="post" action="{% url 'servicios:crear_grupo_medicion' servicio.pk %}">
+      {% csrf_token %}
+      <label>Nombre (ej. Medida de frenos, Megado de motores)</label>
+      {{ grupo_form.nombre }}
+      <label>Unidad (opcional, ej. MΩ, mm)</label>
+      {{ grupo_form.unidad }}
+      <label>Columnas (separadas por coma)</label>
+      {{ grupo_form.columnas }}
+      <p class="ayuda">{{ grupo_form.columnas.help_text }}</p>
+      <label>Filas (separadas por coma)</label>
+      {{ grupo_form.filas }}
+      <p class="ayuda">{{ grupo_form.filas.help_text }}</p>
+      <button type="submit">Crear tabla</button>
+    </form>
+  </div>
+</section>
+
+<section id="observaciones">
+  <h2>7. Observaciones, recomendaciones y conclusiones</h2>
+
+  <h3>Observaciones</h3>
+  <form method="post" action="{% url 'servicios:guardar_observaciones' servicio.pk %}">
+    {% csrf_token %}
+    {{ observaciones_formset.management_form }}
+    {% for form in observaciones_formset %}
+      <div class="fila-formset">
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        <label>Observación</label>
+        {{ form.texto }}
+        <label>Orden</label>
+        {{ form.orden }}
+        {% if form.instance.pk %}
+          <label><input type="checkbox" name="{{ form.prefix }}-DELETE" style="width:auto;display:inline-block;"> Eliminar</label>
+        {% endif %}
+      </div>
+    {% endfor %}
+    <button type="submit">Guardar observaciones</button>
+  </form>
+
+  <h3>Recomendaciones</h3>
+  <form method="post" action="{% url 'servicios:guardar_recomendaciones' servicio.pk %}">
+    {% csrf_token %}
+    {{ recomendaciones_formset.management_form }}
+    {% for form in recomendaciones_formset %}
+      <div class="fila-formset">
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        <label>Recomendación</label>
+        {{ form.texto }}
+        <label>Orden</label>
+        {{ form.orden }}
+        {% if form.instance.pk %}
+          <label><input type="checkbox" name="{{ form.prefix }}-DELETE" style="width:auto;display:inline-block;"> Eliminar</label>
+        {% endif %}
+      </div>
+    {% endfor %}
+    <button type="submit">Guardar recomendaciones</button>
+  </form>
+
+  <h3>Conclusiones</h3>
+  <form method="post" action="{% url 'servicios:guardar_conclusiones' servicio.pk %}">
+    {% csrf_token %}
+    {{ conclusiones_formset.management_form }}
+    {% for form in conclusiones_formset %}
+      <div class="fila-formset">
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        <label>Conclusión</label>
+        {{ form.texto }}
+        <label>Orden</label>
+        {{ form.orden }}
+        {% if form.instance.pk %}
+          <label><input type="checkbox" name="{{ form.prefix }}-DELETE" style="width:auto;display:inline-block;"> Eliminar</label>
+        {% endif %}
+      </div>
+    {% endfor %}
+    <button type="submit">Guardar conclusiones</button>
+  </form>
+</section>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+(function () {
+  // El mensaje "Completa el checklist..." solo tiene sentido cuando la persona NO está
+  // viendo ya esa sección — si no, compite arriba de todo sin aportar nada nuevo.
+  var mensaje = document.getElementById("mensaje-informe-no-disponible");
+  var cta = document.querySelector(".cta-principal");
+  if (!mensaje || !cta) return;
+  var destino = document.getElementById(cta.dataset.destino);
+  if (!destino || !("IntersectionObserver" in window)) return;
+
+  // threshold bajo a propósito: la sección destino (checklist/hallazgos) puede ser mucho más
+  // alta que el viewport (190 ítems), así que un % del ÁREA TOTAL nunca se cumpliría — basta
+  // con que el borde superior ya haya entrado en pantalla.
+  var observer = new IntersectionObserver(
+    function (entradas) {
+      mensaje.hidden = entradas[0].isIntersecting;
+    },
+    { threshold: 0, rootMargin: "-56px 0px 0px 0px" }
+  );
+  observer.observe(destino);
+})();
+
+(function () {
+  // Acordeón por sistema: clic en el título colapsa/expande. Estado inicial (colapsado o no)
+  // ya viene resuelto por el servidor (clase "colapsada" según si el sistema tiene alguna
+  // respuesta guardada), esto solo maneja la interacción.
+  document.querySelectorAll(".sistema-checklist-titulo").forEach(function (boton) {
+    boton.addEventListener("click", function () {
+      boton.closest(".sistema-checklist").classList.toggle("colapsado");
+    });
+  });
+})();
+</script>
+{% endblock %}

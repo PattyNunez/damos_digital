@@ -1,0 +1,61 @@
+{% extends "base_shell.html" %}
+
+{% block title %}Importar productos desde Excel{% endblock %}
+
+{% block encabezado %}Importar productos desde Excel{% endblock %}
+
+{% block content %}
+<p><a class="enlace-volver" href="{% url 'inventario:productos' %}">&larr; Volver a productos</a></p>
+
+<div class="tarjeta-seccion">
+  <h2>Formato esperado</h2>
+  <p>Un archivo <code>.xlsx</code>, primera fila con estos encabezados (el orden de columnas no importa):</p>
+  <table class="mediciones">
+    <tr><th>Encabezado</th><th>Obligatorio</th><th>Notas</th></tr>
+    <tr><td>Código</td><td>Sí</td><td>Si ya existe, se actualiza el producto en vez de duplicarlo</td></tr>
+    <tr><td>Nombre</td><td>Sí</td><td></td></tr>
+    <tr><td>Descripción</td><td>No</td><td></td></tr>
+    <tr><td>Categoría</td><td>No</td><td>Texto libre</td></tr>
+    <tr><td>Unidad de medida</td><td>No</td><td>und, m, kg, lt, etc.</td></tr>
+    <tr><td>Precio referencial</td><td>Sí</td><td>Número positivo</td></tr>
+    <tr><td>Moneda</td><td>No</td><td>PEN o USD (vacío = PEN)</td></tr>
+    <tr><td>Proveedor</td><td>No</td><td>Razón social; si no existe, se crea automáticamente</td></tr>
+  </table>
+
+  <form method="post" enctype="multipart/form-data" style="margin-top:1.2rem;">
+    {% csrf_token %}
+    <label for="{{ form.archivo.id_for_label }}">{{ form.archivo.label }}</label>
+    {{ form.archivo }}
+    {{ form.archivo.errors }}
+    <button type="submit">Importar</button>
+  </form>
+</div>
+
+{% if resultado %}
+<div class="tarjeta-seccion">
+  <h2>Resultado de la importación</h2>
+  <p>
+    {{ resultado.creados }} producto(s) creado(s), {{ resultado.actualizados }} actualizado(s).
+    {% if resultado.proveedores_creados %}{{ resultado.proveedores_creados|length }} proveedor(es) nuevo(s) creado(s) automáticamente.{% endif %}
+  </p>
+
+  {% if resultado.proveedores_creados %}
+  <h3>Proveedores creados automáticamente — revisar posibles duplicados por tipeo</h3>
+  <ul>
+    {% for nombre in resultado.proveedores_creados %}
+    <li>{{ nombre }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if resultado.errores %}
+  <h3>Filas con error ({{ resultado.errores|length }})</h3>
+  <ul>
+    {% for error in resultado.errores %}
+    <li class="ayuda">{{ error }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

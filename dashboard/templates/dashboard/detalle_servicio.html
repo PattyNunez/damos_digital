@@ -1,0 +1,182 @@
+{% extends "base_shell.html" %}
+
+{% block title %}{{ servicio.codigo }} · Detalle{% endblock %}
+
+{% block encabezado %}{{ servicio.codigo }}{% endblock %}
+
+{% block extra_style %}
+<style>
+  .tabla-resumen-cotizacion td { text-align:left; white-space:normal; }
+  .tabla-resumen-cotizacion td:last-child { text-align:right; white-space:nowrap; }
+  .lista-vinetas-detalle { margin:.3rem 0 0 0; padding-left:1.2rem; }
+  .lista-vinetas-detalle li { margin-bottom:.2rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<p><a class="enlace-volver" href="{% url 'dashboard:kanban' %}">&larr; Volver al panel de seguimiento</a></p>
+
+<div class="tarjeta-seccion">
+  <div class="cabecera-servicio">
+    <span class="badge-flujo badge-flujo-{{ servicio.estado }}">{{ servicio.get_estado_display }}</span>
+    <span class="monto-servicio">{{ servicio.monto_total }} {{ servicio.moneda }}</span>
+  </div>
+  <p>
+    {{ servicio.cliente }} — {{ servicio.equipo }}
+    {% if servicio.cliente.ruc %}<span class="ayuda">· RUC {{ servicio.cliente.ruc }}</span>{% endif %}
+  </p>
+  <a href="{% url 'servicios:formulario' servicio.pk %}"><button type="button">Abrir formulario de campo</button></a>
+</div>
+
+{% if servicio.detalle_cotizacion %}
+{% with d=servicio.detalle_cotizacion %}
+<div class="tarjeta-seccion">
+  <h2>Detalle de la cotización</h2>
+  <table class="mediciones tabla-resumen-cotizacion">
+    <tr><td>Mano de obra</td><td>{{ d.subtotal_mano_obra }}</td></tr>
+    <tr><td>Logística</td><td>{{ d.subtotal_logistica }}</td></tr>
+    <tr><td>Equipos</td><td>{{ d.subtotal_equipos }}</td></tr>
+    <tr><td>Indirectos ({{ d.porcentaje_indirectos }}%)</td><td>{{ d.monto_indirectos }}</td></tr>
+    <tr><td>Utilidad servicio ({{ d.porcentaje_utilidad_servicio }}%)</td><td>{{ d.monto_utilidad_servicio }}</td></tr>
+    <tr class="fila-total"><td>Subtotal servicio</td><td>{{ d.subtotal_servicio }}</td></tr>
+    <tr><td>Materiales</td><td>{{ d.subtotal_materiales }}</td></tr>
+    <tr><td>Utilidad repuestos ({{ d.porcentaje_utilidad_repuestos }}%)</td><td>{{ d.monto_utilidad_repuestos }}</td></tr>
+    <tr class="fila-total"><td>Subtotal repuestos</td><td>{{ d.subtotal_repuestos }}</td></tr>
+    <tr><td>IGV ({{ servicio.porcentaje_igv }}%)</td><td>{{ servicio.monto_igv }}</td></tr>
+    <tr class="fila-total"><td>Total</td><td>{{ servicio.monto_total }} {{ servicio.moneda }}</td></tr>
+  </table>
+
+  {% if d.items_mano_obra.exists %}
+  <h3>Mano de obra</h3>
+  <table class="mediciones">
+    <tr><th>Descripción</th><th>Cantidad</th><th>Costo unitario</th><th>Subtotal</th></tr>
+    {% for item in d.items_mano_obra.all %}
+    <tr><td>{{ item.descripcion }}</td><td>{{ item.cantidad }}</td><td>{{ item.costo_unitario }}</td><td>{{ item.subtotal|floatformat:2 }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if d.items_logistica.exists %}
+  <h3>Logística</h3>
+  <table class="mediciones">
+    <tr><th>Descripción</th><th>Cantidad</th><th>Costo unitario</th><th>Subtotal</th></tr>
+    {% for item in d.items_logistica.all %}
+    <tr><td>{{ item.descripcion }}</td><td>{{ item.cantidad }}</td><td>{{ item.costo_unitario }}</td><td>{{ item.subtotal|floatformat:2 }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if d.items_equipo.exists %}
+  <h3>Equipos</h3>
+  <table class="mediciones">
+    <tr><th>Descripción</th><th>Cantidad</th><th>Costo unitario</th><th>Subtotal</th></tr>
+    {% for item in d.items_equipo.all %}
+    <tr><td>{{ item.descripcion }}</td><td>{{ item.cantidad }}</td><td>{{ item.costo_unitario }}</td><td>{{ item.subtotal|floatformat:2 }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if d.items_material.exists %}
+  <h3>Materiales</h3>
+  <table class="mediciones">
+    <tr><th>Producto</th><th>Cantidad</th><th>Costo unitario</th><th>Subtotal</th></tr>
+    {% for item in d.items_material.all %}
+    <tr><td>{{ item.producto.codigo }} - {{ item.producto.nombre }}</td><td>{{ item.cantidad }}</td><td>{{ item.costo_unitario }}</td><td>{{ item.subtotal|floatformat:2 }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if d.items_alcance.exists %}
+  <h3>Alcance del servicio</h3>
+  <ul class="lista-vinetas-detalle">{% for item in d.items_alcance.all %}<li>{{ item.texto }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if d.items_exclusion.exists %}
+  <h3>Exclusiones</h3>
+  <ul class="lista-vinetas-detalle">{% for item in d.items_exclusion.all %}<li>{{ item.texto }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if d.items_provision_cliente.exists %}
+  <h3>Provisiones por el cliente</h3>
+  <ul class="lista-vinetas-detalle">{% for item in d.items_provision_cliente.all %}<li>{{ item.texto }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if d.items_provision_damol.exists %}
+  <h3>Provisiones por Damol</h3>
+  <ul class="lista-vinetas-detalle">{% for item in d.items_provision_damol.all %}<li>{{ item.texto }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+{% endwith %}
+{% endif %}
+
+<div class="tarjeta-seccion">
+  <h2>Línea de tiempo</h2>
+  <table class="mediciones">
+    <tr><th>Estado</th><th>Fecha</th><th>Usuario</th></tr>
+    {% for h in historial %}
+    <tr>
+      <td><span class="badge-flujo badge-flujo-{{ h.estado }}">{{ h.get_estado_display }}</span></td>
+      <td>{{ h.fecha_cambio|date:"d/m/Y H:i" }}</td>
+      <td>{{ h.usuario|default:"---" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="tarjeta-seccion">
+  <h2>Documento generado</h2>
+  {% if informe %}
+    <p>
+      Versión {{ informe.version }}, generada el {{ informe.generado_en|date:"d/m/Y H:i" }}.
+      <a href="{{ informe.archivo_pdf.url }}">Descargar PDF</a>
+    </p>
+  {% else %}
+    <p>Aún no se ha generado un informe para este servicio.</p>
+  {% endif %}
+  {% if servicio.informe_disponible %}
+    <form method="post" action="{% url 'reportes:generar_informe' servicio.pk %}">
+      {% csrf_token %}
+      <button type="submit">{% if informe %}Regenerar informe PDF{% else %}Generar informe PDF{% endif %}</button>
+    </form>
+  {% else %}
+    <p class="ayuda">{{ servicio.mensaje_informe_no_disponible }}</p>
+  {% endif %}
+
+  {% if servicio.detalle_cotizacion %}
+    <hr style="margin:1rem 0; border:none; border-top:1px solid #eee;">
+    {% if propuesta %}
+      <p>
+        Propuesta comercial — versión {{ propuesta.version }}, generada el {{ propuesta.generado_en|date:"d/m/Y H:i" }}.
+        <a href="{{ propuesta.archivo_pdf.url }}">Descargar PDF</a>
+      </p>
+    {% else %}
+      <p>Aún no se ha generado una propuesta comercial para esta cotización.</p>
+    {% endif %}
+    <form method="post" action="{% url 'reportes:generar_propuesta' servicio.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="secundario">{% if propuesta %}Regenerar propuesta comercial{% else %}Generar propuesta comercial{% endif %}</button>
+    </form>
+  {% endif %}
+</div>
+
+<div class="tarjeta-seccion">
+  <h2>Checklist</h2>
+  {% for sistema, respuestas in checklist_por_sistema %}
+    <h3>{{ sistema.nombre }}</h3>
+    <table class="mediciones">
+      <tr><th>Código</th><th>Descripción</th><th>Variante</th><th>Estado</th><th>Comentario</th></tr>
+      {% for r in respuestas %}
+      <tr>
+        <td>{{ r.item.codigo }}</td>
+        <td>{{ r.item.descripcion }}</td>
+        <td>{{ r.variante|default:"---" }}</td>
+        <td><span class="badge-estado badge-estado-{{ r.estado|default:'NA' }}">{{ r.get_estado_display|default:"---" }}</span></td>
+        <td>{{ r.observacion|default:"---" }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% empty %}
+    <p>Este servicio no tiene checklist generado.</p>
+  {% endfor %}
+</div>
+{% endblock %}

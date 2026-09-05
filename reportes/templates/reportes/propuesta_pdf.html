@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Propuesta {{ servicio.codigo }}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 1.8cm 1.8cm 2cm 1.8cm;
+    @bottom-center {
+      content: "Página " counter(page) " de " counter(pages);
+      font-size: 8pt;
+      color: #777;
+    }
+  }
+
+  /* Mismos tokens de marca que informe_pdf.html: naranja #FF9900, Carlito/Montserrat. */
+  * { box-sizing: border-box; }
+  body { font-family: "Carlito", "Calibri", Arial, sans-serif; font-size: 10pt; color: #1a1a1a; line-height: 1.45; }
+  h1, h2, h3 { font-family: "Montserrat", "Century Gothic", sans-serif; color: #1a1a1a; line-height: 1.25; }
+  h2 { font-size: 11.5pt; border-bottom: 1.5pt solid #FF9900; padding-bottom: .12cm; margin: .7cm 0 .3cm 0; text-transform: uppercase; }
+
+  .encabezado { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2pt solid #FF9900; padding-bottom: .4cm; margin-bottom: .5cm; }
+  .encabezado img { height: 1.4cm; }
+  .encabezado .titulo-doc { text-align: right; font-size: 9pt; }
+  .encabezado .titulo-doc .tipo { font-weight: bold; text-transform: uppercase; letter-spacing: .5pt; }
+  .encabezado .titulo-doc .numero { font-weight: bold; color: #FF9900; }
+
+  table.datos-cliente { width: 100%; font-size: 9.5pt; margin-bottom: .3cm; }
+  table.datos-cliente td { padding: .1cm 0; vertical-align: top; }
+  table.datos-cliente td:first-child { font-weight: bold; width: 4cm; }
+
+  .intro { font-size: 9.5pt; margin: .4cm 0; white-space: pre-line; }
+
+  ul.lista-vinetas { margin: .15cm 0; padding-left: .5cm; }
+  ul.lista-vinetas li { margin-bottom: .12cm; }
+  ul.lista-vinetas.exclusiones li::marker { color: #CC0000; }
+  ul.lista-vinetas.alcance li::marker, ul.lista-vinetas.provisiones li::marker { color: #FF9900; }
+
+  .grid-2 { display: flex; gap: 1cm; page-break-inside: avoid; }
+  .grid-2 > div { flex: 1; }
+
+  table.partidas { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-top: .2cm; page-break-inside: avoid; }
+  table.partidas th { background: #FF9900; color: #1a1a1a; text-align: left; padding: .25cm .3cm; font-size: 8.5pt; text-transform: uppercase; }
+  table.partidas td { border-bottom: 0.75pt solid #ddd; padding: .22cm .3cm; }
+  table.partidas td:last-child, table.partidas th:last-child { text-align: right; }
+  table.partidas tr.fila-total td { font-weight: bold; background: #FFF3E0; border-top: 1.5pt solid #FF9900; border-bottom: none; }
+
+  .terminos { font-size: 8.5pt; color: #333; background: #f7f7f7; padding: .35cm .5cm; border-radius: 3pt; margin-top: .4cm; page-break-inside: avoid; }
+  .terminos p { margin: .1cm 0; }
+
+  .firma { margin-top: 1.5cm; text-align: center; font-size: 9.5pt; page-break-inside: avoid; }
+  .firma .linea { border-top: 0.75pt solid #999; width: 6cm; margin: 0 auto .15cm auto; padding-top: .15cm; }
+</style>
+</head>
+<body>
+
+  <div class="encabezado">
+    <img src="{{ logo_damol_data_uri }}" alt="Damol Ingenieros">
+    <div class="titulo-doc">
+      <div class="tipo">Propuesta Técnico-Comercial</div>
+      <div>N° <span class="numero">{{ servicio.codigo }}</span></div>
+      <div>{{ fecha_generacion|date:"d \d\e F \d\e Y" }}</div>
+    </div>
+  </div>
+
+  <table class="datos-cliente">
+    <tr><td>Cliente:</td><td>{{ servicio.cliente.razon_social }}</td></tr>
+    {% if servicio.cliente.direccion %}<tr><td>Dirección:</td><td>{{ servicio.cliente.direccion }}</td></tr>{% endif %}
+    {% if servicio.cliente.contacto_nombre %}<tr><td>Contacto:</td><td>{{ servicio.cliente.contacto_nombre }}{% if servicio.cliente.contacto_telefono %} · {{ servicio.cliente.contacto_telefono }}{% endif %}{% if servicio.cliente.contacto_email %} · {{ servicio.cliente.contacto_email }}{% endif %}</td></tr>{% endif %}
+    {% if servicio.titulo %}<tr><td>Proyecto:</td><td>{{ servicio.titulo }}</td></tr>{% endif %}
+    <tr><td>Equipo:</td><td>{{ servicio.equipo }}</td></tr>
+    {% if servicio.elaborado_por %}<tr><td>Preparado por:</td><td>{{ servicio.elaborado_por }}</td></tr>{% endif %}
+  </table>
+
+  <p class="intro">{{ configuracion.propuesta_intro_texto }}</p>
+
+  {% if items_alcance %}
+  <h2>Alcance del servicio</h2>
+  <ul class="lista-vinetas alcance">
+    {% for item in items_alcance %}<li>{{ item.texto }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if items_exclusion %}
+  <h2>Exclusiones — lo que no incluye esta propuesta</h2>
+  <ul class="lista-vinetas exclusiones">
+    {% for item in items_exclusion %}<li>{{ item.texto }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if items_provision_cliente or items_provision_damol %}
+  <div class="grid-2">
+    {% if items_provision_cliente %}
+    <div>
+      <h2>Provisiones por el cliente</h2>
+      <ul class="lista-vinetas provisiones">
+        {% for item in items_provision_cliente %}<li>{{ item.texto }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% if items_provision_damol %}
+    <div>
+      <h2>Provisiones por Damol</h2>
+      <ul class="lista-vinetas provisiones">
+        {% for item in items_provision_damol %}<li>{{ item.texto }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <h2>Condiciones comerciales</h2>
+  <table class="partidas">
+    <tr><th>Partida</th><th>Monto</th></tr>
+    <tr><td>Mano de obra especializada de campo</td><td>{{ partidas.mano_obra }} {{ servicio.moneda }}</td></tr>
+    <tr><td>Logística, viáticos y desplazamiento de personal</td><td>{{ partidas.logistica }} {{ servicio.moneda }}</td></tr>
+    <tr><td>Alquiler de equipos y maquinaria especializada</td><td>{{ partidas.equipos }} {{ servicio.moneda }}</td></tr>
+    <tr><td>Suministro de materiales y repuestos</td><td>{{ partidas.materiales }} {{ servicio.moneda }}</td></tr>
+    <tr class="fila-total"><td>Valor de venta total (neto, sin IGV)</td><td>{{ total_partidas }} {{ servicio.moneda }}</td></tr>
+  </table>
+
+  <div class="terminos">
+    <p><strong>Impuestos de ley:</strong> los precios cotizados representan el valor de venta neto; no incluyen el {{ servicio.porcentaje_igv }}% de Impuesto General a las Ventas (IGV).</p>
+    <p><strong>Validez de la oferta:</strong> {{ configuracion.propuesta_validez_dias }} días calendario a partir de la fecha de emisión.</p>
+    {% if configuracion.propuesta_terminos_adicionales %}
+      {% for linea in configuracion.propuesta_terminos_adicionales.splitlines %}
+        {% if linea %}<p>{{ linea }}</p>{% endif %}
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <div class="firma">
+    <div class="linea">
+      {% if servicio.elaborado_por %}{{ servicio.elaborado_por }}<br>{% endif %}
+      <strong>Damol Ingenieros</strong>
+    </div>
+  </div>
+
+</body>
+</html>

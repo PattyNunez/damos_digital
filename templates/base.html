@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Damol Digital{% endblock %}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 1rem; font-size: 14px; line-height: 1.4; background:#f2f2f2; color:#222; }
+  h1, h2, h3 { line-height:1.25; margin-top:0; }
+  h1 { font-size:1.25rem; }
+  h2 { font-size:1.05rem; }
+  h3, h4 { font-size:.95rem; }
+  section { background:#fff; border-radius:8px; padding:.85rem 1rem; margin-bottom:1.1rem; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+  nav.secciones { position: sticky; top:0; background:#fff; padding:.5rem; border-radius:8px; margin-bottom:.85rem; overflow-x:auto; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,.12); z-index:10; -webkit-overflow-scrolling: touch; }
+  nav.secciones a { display:inline-block; margin-right:.5rem; padding:.4rem .6rem; background:#eee; border-radius:6px; text-decoration:none; color:#222; font-size:.82rem; }
+  label { display:block; font-weight:600; margin-top:.5rem; margin-bottom:.15rem; font-size:.82rem; color:#444; }
+  input[type=text], input[type=number], input[type=date], input[type=time], input[type=email], textarea, select {
+    width:100%; padding:.35rem .5rem; font-size:.88rem; border:1px solid #ccc; border-radius:6px; background:#fff;
+  }
+  input[type=file] { display:block; margin-top:.3rem; width:100%; font-size:.85rem; }
+  /* Textareas largos (Condiciones ambientales, Objetivo...): más bajos por defecto, con resize
+     activado para quien necesite escribir más — no ocupar tanto alto de entrada. OJO: el widget
+     Textarea de Django trae rows=10 por defecto, que gana sobre min-height — hace falta height
+     explícito para realmente bajarlo. */
+  textarea { height:4.5rem; resize:vertical; }
+  button, input[type=submit] {
+    background:#1a5fb4; color:#fff; border:none; padding:.5rem .9rem; font-size:.85rem; border-radius:6px; margin-top:.6rem; cursor:pointer;
+  }
+  button.secundario { background:#6b6b6b; }
+  button.peligro { background:#c01c28; }
+  .fila-formset { border-top:1px solid #e2e2e2; padding-top:.5rem; margin-top:.5rem; }
+  .foto-lista { display:flex; flex-wrap:wrap; gap:.6rem; margin:.6rem 0; }
+  .foto-lista figure { margin:0; width:110px; }
+  .foto-lista img { width:100%; border-radius:6px; display:block; }
+  .foto-lista figcaption { font-size:.78rem; word-break: break-word; }
+  .foto-lista form { display:inline; margin:0; }
+  .foto-lista button { padding:.3rem .5rem; font-size:.75rem; margin-top:.3rem; }
+  .subir-foto { margin-top:.5rem; }
+  table.mediciones { border-collapse: collapse; width:100%; margin-top:.5rem; display:block; overflow-x:auto; font-size:.85rem; }
+  table.mediciones th, table.mediciones td { border:1px solid #ddd; padding:.3rem; text-align:center; white-space:nowrap; }
+  table.mediciones input { width:6rem; padding:.25rem; }
+  .grupo-medicion { border-top:1px solid #e2e2e2; padding-top:.75rem; margin-top:.75rem; }
+  .mensajes { margin-bottom:1rem; padding:0; }
+  .mensajes li { list-style:none; padding:.65rem; border-radius:6px; margin-bottom:.4rem; }
+  .mensajes .success { background:#d4f4dd; color:#0a5c2b; }
+  .mensajes .error { background:#fbdcdc; color:#8a1c1c; }
+  .errorlist { color:#c01c28; padding-left:1.2rem; margin:.2rem 0; }
+  .ayuda { color:#777; font-size:.85rem; margin-top:.2rem; }
+  .barra-sesion { display:flex; justify-content:flex-end; align-items:center; gap:.6rem; margin-bottom:.6rem; font-size:.85rem; color:#555; }
+  .barra-sesion form { display:inline; margin:0; }
+  .barra-sesion button { background:none; border:none; color:#1a5fb4; padding:0; margin:0; font-size:.85rem; cursor:pointer; text-decoration:underline; }
+</style>
+{% block extra_style %}{% endblock %}
+</head>
+<body>
+{% if request.user.is_authenticated %}
+<div class="barra-sesion">
+  {{ request.user.username }}
+  <form method="post" action="{% url 'cuentas:logout' %}">{% csrf_token %}<button type="submit">Cerrar sesión</button></form>
+</div>
+{% endif %}
+{% if messages %}
+<ul class="mensajes">
+  {% for message in messages %}
+  <li class="{{ message.tags }}">{{ message }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% block content %}{% endblock %}
+{% block extra_script %}{% endblock %}
+</body>
+</html>
