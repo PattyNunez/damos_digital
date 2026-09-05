@@ -1,3 +1,4 @@
+from cloudinary_storage.storage import RawMediaCloudinaryStorage
 from django.conf import settings
 from django.db import models
 
@@ -7,7 +8,9 @@ from servicios.models import Servicio
 class InformeGenerado(models.Model):
     servicio = models.OneToOneField(Servicio, related_name="informe", on_delete=models.CASCADE)
     numero_informe = models.CharField(max_length=50, blank=True)
-    archivo_pdf = models.FileField(upload_to="informes/%Y/%m/")
+    # PDF: es un FileField "raw" para Cloudinary, no un ImageField — necesita su propia clase de
+    # storage (resource_type=raw); la clase por defecto del proyecto es para imágenes.
+    archivo_pdf = models.FileField(upload_to="informes/%Y/%m/", storage=RawMediaCloudinaryStorage())
     # auto_now (no auto_now_add): al regenerar se reemplaza el archivo y se sube la versión,
     # así que la fecha debe reflejar la última generación, no la primera.
     generado_en = models.DateTimeField(auto_now=True)
@@ -72,7 +75,7 @@ class PropuestaComercial(models.Model):
     redistribuidas sin exponer % de margen, alcance/exclusiones/provisiones, términos fijos."""
 
     servicio = models.OneToOneField(Servicio, related_name="propuesta_comercial", on_delete=models.CASCADE)
-    archivo_pdf = models.FileField(upload_to="propuestas/%Y/%m/")
+    archivo_pdf = models.FileField(upload_to="propuestas/%Y/%m/", storage=RawMediaCloudinaryStorage())
     generado_en = models.DateTimeField(auto_now=True)
     generado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL

@@ -1,3 +1,4 @@
+from cloudinary_storage.storage import RawMediaCloudinaryStorage
 from django.db import models
 
 
@@ -25,8 +26,9 @@ class EquipoMedicion(models.Model):
     marca = models.CharField(max_length=100, blank=True)
     modelo = models.CharField(max_length=100, blank=True)
     numero_serie = models.CharField(max_length=100, blank=True)
+    # Es un FileField "raw" para Cloudinary (documento, no imagen) — clase de storage propia.
     certificado_calibracion = models.FileField(
-        upload_to="certificados_equipos/", blank=True, null=True
+        upload_to="certificados_equipos/", blank=True, null=True, storage=RawMediaCloudinaryStorage()
     )
     fecha_calibracion = models.DateField(null=True, blank=True)
     fecha_vencimiento = models.DateField(null=True, blank=True)

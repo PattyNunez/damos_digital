@@ -1,3 +1,4 @@
+from cloudinary_storage.storage import RawMediaCloudinaryStorage
 from django.db import models
 
 from servicios.models import Servicio
@@ -60,7 +61,8 @@ class CalificacionTecnico(models.Model):
 
     tecnico = models.ForeignKey(Tecnico, related_name="calificaciones", on_delete=models.CASCADE)
     nombre_certificacion = models.CharField(max_length=150)
-    archivo = models.FileField(upload_to="certificaciones_tecnicos/")
+    # Es un FileField "raw" para Cloudinary (documento, no imagen) — clase de storage propia.
+    archivo = models.FileField(upload_to="certificaciones_tecnicos/", storage=RawMediaCloudinaryStorage())
     fecha_emision = models.DateField(null=True, blank=True)
     fecha_vencimiento = models.DateField(null=True, blank=True)
 

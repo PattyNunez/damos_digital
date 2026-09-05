@@ -49,6 +49,11 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # cloudinary_storage/cloudinary van DESPUÉS de staticfiles a propósito: los usamos solo
+    # para archivos MEDIA (fotos, PDFs) — los estáticos (CSS/JS) siguen siendo de WhiteNoise.
+    # El orden importa: django-cloudinary-storage pisa collectstatic si va antes.
+    "cloudinary_storage",
+    "cloudinary",
     # apps del dominio Damol
     "cuentas",
     "clientes",
@@ -152,9 +157,22 @@ STATIC_ROOT = BASE_DIR / "staticfiles"  # adonde collectstatic junta todo; White
 # guarde en caché para siempre sin arriesgarse a servir una versión vieja tras un deploy.
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# Media files (fotos de checklist, firmas, certificados, informes PDF generados)
+# Media files (fotos de checklist, firmas, certificados, informes PDF generados): en Cloudinary,
+# no en el disco local — el disco de Render (plan gratuito) no es persistente, se pierde en
+# cada redeploy/reinicio. MEDIA_URL/MEDIA_ROOT ya no importan para servir nada (Cloudinary
+# devuelve su propia URL absoluta), pero se dejan por si algo local los sigue leyendo.
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Todo ImageField que NO tenga un storage explícito (fotos de checklist/hallazgos, logos,
+# firmas) usa esta por defecto. Los FileField "raw" (PDFs, certificados) necesitan la otra
+# clase (RawMediaCloudinaryStorage) — Cloudinary distingue resource_type=image vs raw, así que
+# no sirve una sola clase para todo; se asigna explícitamente en cada uno de esos 4 campos.
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+
+# Credenciales: una sola variable, formato estándar de Cloudinary — se lee sola del entorno
+# (cloudinary.config() la detecta automáticamente), no hace falta declarar CLOUDINARY_STORAGE acá.
+# Ver .env.example para el formato exacto.
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
