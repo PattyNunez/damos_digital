@@ -1,23 +1,55 @@
-{% extends "base.html" %}
+{% extends "base_shell.html" %}
 
 {% block title %}{{ servicio.codigo }} · Checklist de campo{% endblock %}
 
+{% block encabezado %}{{ servicio.codigo }}{% endblock %}
+
 {% block extra_style %}
 <style>
+  /* --- Piezas de base.html que formulario_servicio.html todavía necesita y base_shell.html
+     no trae (porque nadie más las usaba) — se preservan acá, sin tocar el shell compartido. --- */
+  textarea { height: 4.5rem; resize: vertical; }
+  input[type=date], input[type=time] {
+    width: 100%; padding: .55rem .7rem; font-size: .9rem; border: 1px solid #d5d8dc;
+    border-radius: 6px; background: #fff; font-family: inherit;
+  }
+  input[type=file] { display: block; width: 100%; }
+  .grupo-medicion { border-top: 1px solid #e2e2e2; padding-top: .75rem; margin-top: .75rem; }
+  table.mediciones input { width: 6rem; padding: .25rem; }
+
+  .foto-lista { display: flex; flex-wrap: wrap; gap: .6rem; margin: .6rem 0; }
+  .foto-lista figure { margin: 0; width: 110px; }
+  .foto-lista figcaption { font-size: .78rem; word-break: break-word; color: #555; }
+  .foto-lista form { display: inline; margin: 0; }
+  .foto-lista button { padding: .3rem .5rem; font-size: .75rem; margin-top: .3rem; }
+  .subir-foto { margin-top: .5rem; }
+
+  /* Placeholder limpio para fotos sin cargar/rotas: ícono de cámara gris de fondo, tapado por
+     la foto real en cuanto carga (object-fit:cover la cubre por completo); si la foto falla o
+     no existe, se ve el ícono en vez del ícono nativo de "imagen rota" del navegador. */
+  .foto-lista img {
+    width: 100%; height: 110px; object-fit: cover; border-radius: 6px; display: block;
+    background-color: #eef0f2;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa0a6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z'/%3E%3Ccircle cx='12' cy='14' r='3.3'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: center; background-size: 2.2rem;
+    color: transparent; /* oculta el alt text si el navegador llega a mostrarlo */
+  }
+
   /* --- CTA principal al entrar al servicio: llenar checklist/hallazgos, no "una pestaña más". --- */
   .cta-principal { display:block; text-decoration:none; margin-bottom:.6rem; }
   .cta-principal button { width:100%; font-size:1.05rem; padding:.9rem 1.25rem; }
 
   /* --- Checklist reestructurado: categoría (Mecánico/Eléctrico/Generales) > sistema > ítem,
-     mismo agrupamiento del checklist físico MNT-F-001. --- */
+     mismo agrupamiento del checklist físico MNT-F-001. Paleta de marca (naranja/negro/gris),
+     nada de azul/índigo. --- */
   .categoria-checklist {
     margin:1.6rem 0 .5rem; padding:.55rem .8rem; border-radius:6px; font-size:1.05rem;
-    border-left:5px solid #445; background:#eef1f5; color:#223;
+    border-left:5px solid #868e96; background:#f1f3f5; color:var(--gris-oscuro);
   }
   .categoria-checklist:first-of-type { margin-top:.4rem; }
-  .categoria-checklist.cat-mecanico { border-left-color:#3b5bdb; background:#eef1fb; color:#1c2a63; }
-  .categoria-checklist.cat-electrico { border-left-color:#f08c00; background:#fff4e6; color:#7a4a00; }
-  .categoria-checklist.cat-generales { border-left-color:#868e96; background:#f1f3f5; color:#495057; }
+  .categoria-checklist.cat-mecanico { border-left-color: var(--gris-oscuro); background:#e9ecef; color: var(--gris-oscuro); }
+  .categoria-checklist.cat-electrico { border-left-color: var(--naranja-damol); background: var(--naranja-damol-suave); color: var(--gris-oscuro); }
+  .categoria-checklist.cat-generales { border-left-color:#868e96; background:#f1f3f5; color: var(--gris-oscuro); }
   .sistema-checklist-titulo {
     display:flex; align-items:center; gap:.4rem; width:100%; margin:1rem 0 .3rem;
     font-size:1rem; font-weight:700; color:#444; background:none; border:none; padding:.4rem 0;
@@ -34,6 +66,7 @@
     .fila-item-checklist .col-observacion label { margin-top:0; }
   }
 
+  /* --- Chips B/R/M/N.A.: correctos tal cual están, sin tocar. --- */
   .chips-estado { display:flex; flex-wrap:wrap; gap:.4rem; }
   .chip-estado {
     display:flex; align-items:center; justify-content:center; min-width:2.7rem; height:2.7rem; padding:0 .5rem;
@@ -51,17 +84,49 @@
   .chip-estado.chip-m:has(input:checked) { background:#c62828; }
   .chip-estado.chip-na:has(input:checked) { background:#9aa0a6; }
 
-  /* --- CTA principal: mismo naranja/ámbar que el resto de la app (dashboard, kanban, chips). --- */
-  .cta-principal button { background:#FF9900; color:#1a1a1a; }
-
   /* --- Campos cortos en fila (Datos generales: fecha/hora) --- */
   .fila-3col { display:grid; grid-template-columns:1fr; gap:0 .75rem; }
   @media (min-width:480px) { .fila-3col { grid-template-columns:repeat(3, 1fr); } }
+
+  /* --- Pestañas de navegación: naranja para la sección activa. Activa = la que coincide con
+     el #ancla actual de la URL (:target puro CSS, sin JS) — y como cada "Guardar..." ya
+     redirige a su propia ancla (ver _volver() en views.py), queda marcada sola al guardar. --- */
+  .pestanas-formulario {
+    display:flex; flex-wrap:wrap; gap:.3rem; background:#fff; border-radius:10px;
+    padding:.5rem; margin-bottom:1.5rem; box-shadow:0 1px 4px rgba(0,0,0,.08);
+    position:sticky; top:0; z-index:10;
+  }
+  .pestanas-formulario a {
+    padding:.55rem .95rem; border-radius:6px; text-decoration:none; font-size:.85rem;
+    font-weight:600; color:#6b7280; white-space:nowrap;
+  }
+  .pestanas-formulario a:hover { background:#f2f2f2; color:var(--gris-oscuro); }
+  body:has(#generales:target) .pestanas-formulario a[href="#generales"],
+  body:has(#personal:target) .pestanas-formulario a[href="#personal"],
+  body:has(#materiales:target) .pestanas-formulario a[href="#materiales"],
+  body:has(#checklist:target) .pestanas-formulario a[href="#checklist"],
+  body:has(#hallazgos:target) .pestanas-formulario a[href="#hallazgos"],
+  body:has(#mediciones:target) .pestanas-formulario a[href="#mediciones"],
+  body:has(#observaciones:target) .pestanas-formulario a[href="#observaciones"] {
+    background: var(--naranja-damol); color: #1a1a1a;
+  }
+
+  /* --- Aire entre bloques dentro de una misma sección (ej. Observaciones/Recomendaciones/
+     Conclusiones, o cada tabla de Mediciones): línea fina + separación, no solo el margen
+     por defecto del h3, que se sentía "pegado" al botón de arriba. --- */
+  .tarjeta-seccion form + h3 {
+    margin-top: 2.2rem; padding-top: 1.3rem; border-top: 1px solid #eee;
+  }
+
+  /* Las pestañas son sticky (top:0): sin esto, saltar a un ancla deja su título tapado
+     detrás de la barra de pestañas en vez de debajo. */
+  #generales, #personal, #materiales, #checklist, #hallazgos, #mediciones, #observaciones {
+    scroll-margin-top: 4.5rem;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<h1>{{ servicio.codigo }}</h1>
 <p>{{ servicio.cliente }} — {{ servicio.equipo }}</p>
 
 {% if servicio.tipo_servicio == "preventivo" %}
@@ -79,7 +144,7 @@
 <p class="ayuda" id="mensaje-informe-no-disponible">{{ servicio.mensaje_informe_no_disponible }}</p>
 {% endif %}
 
-<nav class="secciones">
+<nav class="pestanas-formulario">
   <a href="#generales">Datos generales</a>
   <a href="#personal">Personal</a>
   <a href="#materiales">Materiales</a>
@@ -89,7 +154,7 @@
   <a href="#observaciones">Observ./Recom./Concl.</a>
 </nav>
 
-<section id="generales">
+<section id="generales" class="tarjeta-seccion">
   <h2>1. Datos generales del servicio</h2>
   <form method="post" action="{% url 'servicios:guardar_ficha' servicio.pk %}">
     {% csrf_token %}
@@ -120,7 +185,7 @@
   </form>
 </section>
 
-<section id="personal">
+<section id="personal" class="tarjeta-seccion">
   <h2>2. Personal ejecutor</h2>
   <form method="post" enctype="multipart/form-data" action="{% url 'servicios:guardar_personal' servicio.pk %}">
     {% csrf_token %}
@@ -145,7 +210,7 @@
   </form>
 </section>
 
-<section id="materiales">
+<section id="materiales" class="tarjeta-seccion">
   <h2>3. Materiales y herramientas usadas</h2>
   <form method="post" action="{% url 'servicios:guardar_materiales' servicio.pk %}">
     {% csrf_token %}
@@ -173,7 +238,7 @@
   </form>
 </section>
 
-<section id="checklist">
+<section id="checklist" class="tarjeta-seccion">
   <h2>4. Checklist por sistema</h2>
   {% if not checklist_por_categoria %}
     {% if servicio.tipo_servicio == "correctivo" %}
@@ -268,7 +333,7 @@
   {% endfor %}
 </section>
 
-<section id="hallazgos">
+<section id="hallazgos" class="tarjeta-seccion">
   <h2>5. Hallazgos importantes</h2>
   <p class="ayuda">
     Regístra acá cualquier cosa que no esté contemplada en el checklist estándar (o, si este
@@ -331,7 +396,7 @@
   {% endfor %}
 </section>
 
-<section id="mediciones">
+<section id="mediciones" class="tarjeta-seccion">
   <h2>6. Mediciones técnicas</h2>
 
   {% for data in grupos_medicion_data %}
@@ -389,7 +454,7 @@
   </div>
 </section>
 
-<section id="observaciones">
+<section id="observaciones" class="tarjeta-seccion">
   <h2>7. Observaciones, recomendaciones y conclusiones</h2>
 
   <h3>Observaciones</h3>

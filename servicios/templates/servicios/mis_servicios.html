@@ -1,26 +1,40 @@
-{% extends "base.html" %}
+{% extends "base_shell.html" %}
 
 {% block title %}Mis servicios{% endblock %}
 
-{% block content %}
-<h1>Mis servicios</h1>
+{% block encabezado %}Mis servicios{% endblock %}
 
+{% block extra_style %}
+<style>
+  /* Mismas tarjetas del kanban (.tarjeta-kanban), reutilizadas como lista personal del
+     técnico — no son columnas acá, solo una lista vertical de sus propios servicios. */
+  .lista-mis-servicios { display: grid; gap: .85rem; max-width: 640px; }
+  .tarjeta-servicio-tecnico { padding: 1rem 1.1rem; }
+  .tarjeta-servicio-tecnico .badge-flujo { margin-bottom: .45rem; }
+  .tarjeta-servicio-tecnico .equipo-tecnico { color: #555; margin-top: .15rem; }
+  .tarjeta-servicio-tecnico .tipo-tecnico { margin-top: .3rem; }
+</style>
+{% endblock %}
+
+{% block content %}
 {% if not tecnico %}
-  <section>
-    <p class="ayuda">Tu usuario todavía no está enlazado a un registro de personal (Técnico). Pídele a un administrador que lo configure desde el admin para poder ver tus servicios asignados.</p>
-  </section>
+<div class="tarjeta-seccion">
+  <p class="ayuda">Tu usuario todavía no está enlazado a un registro de personal (Técnico). Pídele a un administrador que lo configure desde el admin para poder ver tus servicios asignados.</p>
+</div>
 {% endif %}
 
-<section>
-  {% for s in servicios %}
-    <div class="fila-formset">
-      <strong>{{ s.codigo }}</strong> — {{ s.get_tipo_servicio_display }}<br>
-      {{ s.cliente }} — {{ s.equipo }}<br>
-      <span class="ayuda">Estado: {{ s.get_estado_display }}</span><br>
-      <a href="{% url 'servicios:formulario' s.pk %}"><button type="button">Abrir formulario de campo</button></a>
-    </div>
-  {% empty %}
-    <p>No tienes servicios asignados todavía.</p>
-  {% endfor %}
-</section>
+<div class="tarjeta-seccion">
+  <div class="lista-mis-servicios">
+    {% for s in servicios %}
+    <a class="tarjeta-kanban tarjeta-servicio-tecnico" href="{% url 'servicios:formulario' s.pk %}">
+      <span class="badge-flujo badge-flujo-{{ s.estado }}">{{ s.get_estado_display }}</span>
+      <strong>{{ s.codigo }}</strong>
+      <div class="equipo-tecnico">{{ s.cliente }} — {{ s.equipo }}</div>
+      <div class="ayuda tipo-tecnico">{{ s.get_tipo_servicio_display }}</div>
+    </a>
+    {% empty %}
+    <p class="sin-tarjetas">No tienes servicios asignados todavía.</p>
+    {% endfor %}
+  </div>
+</div>
 {% endblock %}

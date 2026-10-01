@@ -176,41 +176,43 @@ def guardar_informe(servicio, pdf_bytes, usuario=None):
     return informe
 
 
-def _partidas_propuesta(detalle):
-    """Redistribuye indirectos + utilidad de servicio proporcionalmente sobre mano de obra,
-    logística y equipos, sin exponer nunca el % de margen en el documento del cliente.
-    Materiales ya trae su propia utilidad incluida en subtotal_repuestos, no necesita factor.
+def _bloque_equipo_propuesta(detalle, nombre_equipo=None):
+    """Empaqueta los 2 montos consolidados del equipo para la tabla de precios de la propuesta:
+    'Servicio de mantenimiento correctivo' = subtotal_servicio y 'Suministro' = subtotal_repuestos.
+    Ambos ya vienen calculados y correctos desde DetalleCotizacion.recalcular() — esta función
+    no recalcula nada, solo los junta en la forma que necesita la plantilla.
 
-    Equipos absorbe el residuo de redondeo de los otros dos, para que las 3 partidas de
-    servicio sumen SIEMPRE exactamente subtotal_servicio (nunca un centavo de diferencia
-    visible entre las partidas y el total del documento)."""
-    directo_servicio = detalle.subtotal_mano_obra + detalle.subtotal_logistica + detalle.subtotal_equipos
-    factor = detalle.subtotal_servicio / directo_servicio if directo_servicio > 0 else Decimal("1")
-
-    partida_mano_obra = round(detalle.subtotal_mano_obra * factor, 2)
-    partida_logistica = round(detalle.subtotal_logistica * factor, 2)
-    partida_equipos = detalle.subtotal_servicio - partida_mano_obra - partida_logistica
-
+    nombre_equipo es un override opcional (en vez de tomar detalle.servicio.equipo): permite
+    armar, solo a nivel de plantilla/demo, una propuesta con varios bloques de equipo sin
+    necesitar todavía el modelo real de agrupación multi-equipo (Opción A, fase aparte)."""
+    nombre = nombre_equipo or str(detalle.servicio.equipo)
     return {
-        "mano_obra": partida_mano_obra,
-        "logistica": partida_logistica,
-        "equipos": partida_equipos,
-        "materiales": detalle.subtotal_repuestos,
+        "nombre_equipo": nombre,
+        "subtotal_servicio": detalle.subtotal_servicio,
+        "subtotal_repuestos": detalle.subtotal_repuestos,
+        "total": detalle.subtotal_servicio + detalle.subtotal_repuestos,
     }
 
 
-def generar_contexto_propuesta(servicio):
+def generar_contexto_propuesta(servicio, bloques_equipo=None):
     configuracion = ConfiguracionInforme.obtener()
     detalle = servicio.detalle_cotizacion
-    partidas = _partidas_propuesta(detalle)
+
+    # Hoy 1 cotización = 1 Servicio = 1 equipo (el modelo no agrupa varios todavía). bloques_equipo
+    # ya deja la plantilla lista para mostrar varios equipos en una sola propuesta el día que ese
+    # cambio de modelo se haga; mientras tanto, con un solo Servicio real, es una lista de 1.
+    if bloques_equipo is None:
+        bloques_equipo = [_bloque_equipo_propuesta(detalle)]
+
+    total_general = sum((b["total"] for b in bloques_equipo), Decimal("0"))
 
     return {
         "servicio": servicio,
         "configuracion": configuracion,
         "logo_damol_data_uri": _logo_damol_data_uri(),
         "fecha_generacion": timezone.localdate(),
-        "partidas": partidas,
-        "total_partidas": partidas["mano_obra"] + partidas["logistica"] + partidas["equipos"] + partidas["materiales"],
+        "bloques_equipo": bloques_equipo,
+        "total_partidas": total_general,
         "items_alcance": detalle.items_alcance.all(),
         "items_exclusion": detalle.items_exclusion.all(),
         "items_provision_cliente": detalle.items_provision_cliente.all(),
@@ -218,10 +220,10 @@ def generar_contexto_propuesta(servicio):
     }
 
 
-def generar_pdf_propuesta(servicio):
+def generar_pdf_propuesta(servicio, bloques_equipo=None):
     from weasyprint import HTML
 
-    contexto = generar_contexto_propuesta(servicio)
+    contexto = generar_contexto_propuesta(servicio, bloques_equipo=bloques_equipo)
     html_string = render_to_string("reportes/propuesta_pdf.html", contexto)
     return HTML(string=html_string, base_url="/").write_pdf()
 
